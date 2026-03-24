@@ -1,0 +1,93 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  googleId     String   @unique
+  email        String   @unique
+  name         String
+  accessToken  String
+  refreshToken String
+  createdAt    DateTime @default(now())
+  decks        Deck[]
+}
+
+model Deck {
+  id           String    @id @default(cuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id])
+  googleId     String
+  title        String
+  slideCount   Int       @default(0)
+  exportedAt   DateTime?
+  exportStatus String    @default("pending")
+  createdAt    DateTime  @default(now())
+  slides       Slide[]
+  links        ShareLink[]
+}
+
+model Slide {
+  id        String         @id @default(cuid())
+  deckId    String
+  deck      Deck           @relation(fields: [deckId], references: [id], onDelete: Cascade)
+  index     Int
+  imageUrl  String
+  createdAt DateTime       @default(now())
+  overlays  SlideOverlay[]
+
+  @@unique([deckId, index])
+}
+
+model SlideOverlay {
+  id       String @id @default(cuid())
+  slideId  String
+  slide    Slide  @relation(fields: [slideId], references: [id], onDelete: Cascade)
+  imageUrl String
+  x        Float
+  y        Float
+  width    Float
+  height   Float
+  zIndex   Int    @default(0)
+}
+
+model ShareLink {
+  id        String       @id @default(cuid())
+  deckId    String
+  deck      Deck         @relation(fields: [deckId], references: [id], onDelete: Cascade)
+  slug      String       @unique
+  label     String?
+  active    Boolean      @default(true)
+  createdAt DateTime     @default(now())
+  expiresAt DateTime?
+  sessions  ViewSession[]
+}
+
+model ViewSession {
+  id           String       @id @default(cuid())
+  linkId       String
+  link         ShareLink    @relation(fields: [linkId], references: [id], onDelete: Cascade)
+  viewerIp     String
+  userAgent    String
+  country      String?
+  city         String?
+  startedAt    DateTime     @default(now())
+  endedAt      DateTime?
+  totalSeconds Int?
+  events       SlideEvent[]
+}
+
+model SlideEvent {
+  id         String      @id @default(cuid())
+  sessionId  String
+  session    ViewSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  slideIndex Int
+  enteredAt  DateTime
+  exitedAt   DateTime?
+  durationMs Int?
+}
