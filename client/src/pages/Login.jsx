@@ -37,7 +37,7 @@ export default function Login() {
       </div>
 
       <a
-        href="http://localhost:3002/auth/google"
+        href={`${import.meta.env.VITE_API_URL || ''}/auth/google`}
         className="btn btn-primary"
         style={{ fontSize: 16, padding: '12px 32px' }}
       >
