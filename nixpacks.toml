@@ -2,7 +2,7 @@
 nixPkgs = ["nodejs_22"]
 
 [phases.install]
-cmds = ["npm i --ignore-scripts", "cd server && npm i", "cd client && npm i"]
+cmds = ["npm i", "cd server && npm i", "cd client && npm i"]
 
 [phases.build]
 cmds = ["cd client && npm run build"]
