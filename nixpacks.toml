@@ -1,11 +1,11 @@
 [phases.setup]
-nixPkgs = ["nodejs_22"]
+nixPkgs = ["nodejs-22_x"]
 
 [phases.install]
-cmds = ["npm ci || npm i"]
+cmds = ["npm i --ignore-scripts", "cd server && npm i", "cd client && npm i"]
 
 [phases.build]
-cmds = ["npm run build"]
+cmds = ["cd client && npm run build"]
 
 [start]
-cmd = "npm start"
+cmd = "npm run db:migrate && cd server && node index.js"

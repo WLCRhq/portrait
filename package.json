@@ -10,7 +10,6 @@
     "build": "cd client && npm run build",
     "start": "npm run db:migrate && cd server && node index.js",
     "dev": "concurrently \"cd server && npm run dev\" \"cd client && npm run dev\"",
-    "db:migrate": "cd server && npx prisma migrate deploy --schema=prisma/schema.prisma",
-    "postinstall": "npm run install:all && npm run build"
+    "db:migrate": "cd server && npx prisma migrate deploy --schema=prisma/schema.prisma"
   }
 }
