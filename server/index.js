@@ -73,7 +73,7 @@ if (process.env.NODE_ENV === 'production') {
   const clientDist = path.join(__dirname, '..', 'client', 'dist');
   app.use(express.static(clientDist));
   // All non-API routes fall through to the React app
-  app.get('*', (_req, res) => {
+  app.get('{*path}', (_req, res) => {
     res.sendFile(path.join(clientDist, 'index.html'));
   });
 }
