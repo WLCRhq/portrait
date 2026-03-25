@@ -2,6 +2,9 @@
   "name": "portrait",
   "version": "1.0.0",
   "private": true,
+  "engines": {
+    "node": ">=22.0.0"
+  },
   "scripts": {
     "install:all": "cd server && npm install && cd ../client && npm install",
     "build": "cd client && npm run build",
