@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import LoadingSpinner from '../components/LoadingSpinner.jsx';
 
 function isLightColor(hex) {
   if (!hex) return false;
@@ -9,7 +10,6 @@ function isLightColor(hex) {
   const r = parseInt(c.substring(0, 2), 16);
   const g = parseInt(c.substring(2, 4), 16);
   const b = parseInt(c.substring(4, 6), 16);
-  // Perceived brightness formula
   return (r * 299 + g * 587 + b * 114) / 1000 > 140;
 }
 
@@ -23,6 +23,7 @@ export default function Viewer() {
   const [overlays, setOverlays] = useState([]);
   const enteredAtRef = useRef(Date.now());
   const slideContainerRef = useRef(null);
+  const preloadedRef = useRef(new Set());
 
   // Fetch metadata and create session
   useEffect(() => {
@@ -57,6 +58,29 @@ export default function Viewer() {
       if (root) root.style.backgroundColor = prevRoot;
     };
   }, [meta]);
+
+  // Preload upcoming slides (current +1, +2, +3)
+  useEffect(() => {
+    if (!meta) return;
+    const cacheBust = meta.exportedAt ? `?v=${new Date(meta.exportedAt).getTime()}` : '';
+
+    for (let offset = 1; offset <= 3; offset++) {
+      const idx = currentSlide + offset;
+      if (idx >= meta.slideCount) break;
+      if (preloadedRef.current.has(idx)) continue;
+
+      const img = new Image();
+      img.src = `/api/view/${slug}/slide/${idx}${cacheBust}`;
+      preloadedRef.current.add(idx);
+    }
+
+    // Also preload one slide back
+    if (currentSlide > 0 && !preloadedRef.current.has(currentSlide - 1)) {
+      const img = new Image();
+      img.src = `/api/view/${slug}/slide/${currentSlide - 1}${cacheBust}`;
+      preloadedRef.current.add(currentSlide - 1);
+    }
+  }, [currentSlide, meta, slug]);
 
   // Fetch overlays when slide changes
   useEffect(() => {
@@ -159,7 +183,7 @@ export default function Viewer() {
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh',
       }}>
-        <div className="skeleton" style={{ width: '80vw', height: '60vh' }} />
+        <LoadingSpinner />
       </div>
     );
   }
@@ -190,11 +214,15 @@ export default function Viewer() {
         flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
         position: 'relative', overflow: 'hidden',
       }}>
+        {/* Loading spinner while slide image loads */}
         {imageLoading && (
-          <div className="skeleton" style={{
-            position: 'absolute', width: '80%', height: '80%',
-            background: '#222',
-          }} />
+          <div style={{
+            position: 'absolute', inset: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 1,
+          }}>
+            <LoadingSpinner light={light} />
+          </div>
         )}
 
         {/* Slide container: thumbnail + GIF overlays */}
@@ -208,7 +236,7 @@ export default function Viewer() {
             style={{
               maxWidth: '100vw', maxHeight: 'calc(100vh - 40px)', objectFit: 'contain',
               display: 'block',
-              opacity: imageLoading ? 0 : 1, transition: 'opacity 0.2s',
+              opacity: imageLoading ? 0 : 1, transition: 'opacity 0.3s ease',
             }}
             onLoad={() => setImageLoading(false)}
             draggable={false}
@@ -237,8 +265,6 @@ export default function Viewer() {
               );
             }
 
-            // Crop: container clips to the visible area, image is scaled up
-            // to account for the cropped edges
             const visibleW = 1 - overlay.cropLeft - overlay.cropRight;
             const visibleH = 1 - overlay.cropTop - overlay.cropBottom;
             const imgWidthPct = (1 / visibleW) * 100;
