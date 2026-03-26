@@ -30,7 +30,7 @@ export default function Login() {
       padding: 24,
     }}>
       <div style={{ textAlign: 'center' }}>
-        <img src="/portrait-logo.png" alt="Portrait" style={{ height: 80 }} />
+        <img src="/portrait-logo.png" alt="Portrait" style={{ height: 160 }} />
         <p style={{ fontSize: 18, maxWidth: 500, margin: '16px auto 0' }}>
           Share Google Slides presentations with trackable links and detailed viewer analytics.
         </p>

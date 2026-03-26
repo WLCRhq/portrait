@@ -63,7 +63,7 @@ export default function Dashboard() {
     <div className="container">
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32 }}>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-          <img src="/portrait-logo.png" alt="Portrait" style={{ height: 36 }} />
+          <img src="/portrait-logo.png" alt="Portrait" style={{ height: 72 }} />
           {user && <p style={{ fontSize: 14, marginTop: 6 }}>Welcome, {user.name}</p>}
         </div>
         <button className="btn btn-secondary btn-sm" onClick={handleLogout}>
