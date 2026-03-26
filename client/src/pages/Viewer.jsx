@@ -176,23 +176,65 @@ export default function Viewer() {
             draggable={false}
           />
 
-          {/* GIF overlays positioned on top of the slide */}
-          {!imageLoading && overlays.map((overlay) => (
-            <img
-              key={overlay.id}
-              src={overlay.imageUrl}
-              alt=""
-              style={{
-                position: 'absolute',
-                left: `${overlay.x}%`,
-                top: `${overlay.y}%`,
-                width: `${overlay.width}%`,
-                height: `${overlay.height}%`,
-                objectFit: 'contain',
-                pointerEvents: 'none',
-              }}
-            />
-          ))}
+          {/* GIF overlays positioned on top of the slide, with crop applied */}
+          {!imageLoading && overlays.map((overlay) => {
+            const hasCrop = overlay.cropTop || overlay.cropBottom || overlay.cropLeft || overlay.cropRight;
+
+            if (!hasCrop) {
+              return (
+                <img
+                  key={overlay.id}
+                  src={overlay.imageUrl}
+                  alt=""
+                  style={{
+                    position: 'absolute',
+                    left: `${overlay.x}%`,
+                    top: `${overlay.y}%`,
+                    width: `${overlay.width}%`,
+                    height: `${overlay.height}%`,
+                    objectFit: 'fill',
+                    pointerEvents: 'none',
+                  }}
+                />
+              );
+            }
+
+            // Crop: container clips to the visible area, image is scaled up
+            // to account for the cropped edges
+            const visibleW = 1 - overlay.cropLeft - overlay.cropRight;
+            const visibleH = 1 - overlay.cropTop - overlay.cropBottom;
+            const imgWidthPct = (1 / visibleW) * 100;
+            const imgHeightPct = (1 / visibleH) * 100;
+            const imgLeftPct = -(overlay.cropLeft / visibleW) * 100;
+            const imgTopPct = -(overlay.cropTop / visibleH) * 100;
+
+            return (
+              <div
+                key={overlay.id}
+                style={{
+                  position: 'absolute',
+                  left: `${overlay.x}%`,
+                  top: `${overlay.y}%`,
+                  width: `${overlay.width}%`,
+                  height: `${overlay.height}%`,
+                  overflow: 'hidden',
+                  pointerEvents: 'none',
+                }}
+              >
+                <img
+                  src={overlay.imageUrl}
+                  alt=""
+                  style={{
+                    position: 'absolute',
+                    width: `${imgWidthPct}%`,
+                    height: `${imgHeightPct}%`,
+                    left: `${imgLeftPct}%`,
+                    top: `${imgTopPct}%`,
+                  }}
+                />
+              </div>
+            );
+          })}
         </div>
 
         {/* Navigation overlays */}

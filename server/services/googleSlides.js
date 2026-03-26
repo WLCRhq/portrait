@@ -24,7 +24,6 @@ export async function getAuthClient(userId) {
 
   const client = createAuthClient(user.accessToken, user.refreshToken);
 
-  // Force a token refresh to ensure it's valid
   try {
     const { credentials } = await client.refreshAccessToken();
     if (credentials.access_token !== user.accessToken) {
@@ -35,7 +34,6 @@ export async function getAuthClient(userId) {
     }
     client.setCredentials(credentials);
   } catch (err) {
-    // If refresh fails, try using the existing token
     console.warn('Token refresh failed, using existing token:', err.message);
   }
 
@@ -67,7 +65,8 @@ export async function getPresentationMetadata(authClient, presentationId) {
 
 /**
  * Extract image elements from a slide's page elements.
- * Returns position/size as percentages of the slide dimensions.
+ * Returns position/size as percentages of the slide dimensions,
+ * plus crop properties from Google Slides.
  */
 export function extractImageElements(pageElements, pageWidth, pageHeight) {
   const images = [];
@@ -86,6 +85,9 @@ export function extractImageElements(pageElements, pageWidth, pageHeight) {
     const elX = transform.translateX || 0;
     const elY = transform.translateY || 0;
 
+    // Extract crop properties (fractions 0.0-1.0 from each edge)
+    const crop = el.image.imageProperties?.cropProperties || {};
+
     images.push({
       contentUrl,
       sourceUrl,
@@ -93,6 +95,10 @@ export function extractImageElements(pageElements, pageWidth, pageHeight) {
       y: (elY / pageHeight) * 100,
       width: (elWidth / pageWidth) * 100,
       height: (elHeight / pageHeight) * 100,
+      cropTop: crop.topOffset || 0,
+      cropBottom: crop.bottomOffset || 0,
+      cropLeft: crop.leftOffset || 0,
+      cropRight: crop.rightOffset || 0,
     });
   }
 
@@ -101,6 +107,7 @@ export function extractImageElements(pageElements, pageWidth, pageHeight) {
 
 /**
  * Get thumbnail URL for a specific slide page.
+ * Requests LARGE (1600px) then upgrades to higher res via URL manipulation.
  */
 export async function getSlideThumbnailUrl(authClient, presentationId, pageObjectId) {
   const slides = google.slides({ version: 'v1', auth: authClient });
@@ -110,5 +117,15 @@ export async function getSlideThumbnailUrl(authClient, presentationId, pageObjec
     'thumbnailProperties.thumbnailSize': 'LARGE',
   });
 
-  return res.data.contentUrl;
+  let url = res.data.contentUrl;
+
+  // Google image URLs support size params — try to get higher resolution
+  // Replace =s1600 with =s3200 for 2x resolution, or append if not present
+  if (url.includes('=s')) {
+    url = url.replace(/=s\d+/, '=s3200');
+  } else if (url.includes('?')) {
+    url += '&sz=s3200';
+  }
+
+  return url;
 }

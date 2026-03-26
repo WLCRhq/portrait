@@ -63,6 +63,10 @@ const worker = new Worker('slide-export', async (job) => {
                 width: img.width,
                 height: img.height,
                 zIndex: overlayIndex,
+                cropTop: img.cropTop,
+                cropBottom: img.cropBottom,
+                cropLeft: img.cropLeft,
+                cropRight: img.cropRight,
               },
             });
 
