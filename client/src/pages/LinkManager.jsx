@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
-import { ArrowLeft, Plus, Copy, Trash2, ToggleLeft, ToggleRight, Check } from 'lucide-react';
+import { Plus, Copy, Trash2, ToggleLeft, ToggleRight, Check, LayoutDashboard, BarChart3 } from 'lucide-react';
 
 const api = axios.create({ withCredentials: true });
 
@@ -64,8 +64,13 @@ export default function LinkManager() {
   return (
     <div className="container">
       <header style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24 }}>
-        <Link to={`/dashboard/decks/${deckId}`} style={{ color: 'var(--text)' }}><ArrowLeft size={20} /></Link>
         <h1 style={{ fontSize: 24, flex: 1 }}>Share Links</h1>
+        <Link to="/dashboard" className="btn btn-secondary btn-sm">
+          <LayoutDashboard size={14} /> Dashboard
+        </Link>
+        <Link to={`/dashboard/decks/${deckId}`} className="btn btn-secondary btn-sm">
+          <BarChart3 size={14} /> Analytics
+        </Link>
       </header>
 
       {/* Create form */}

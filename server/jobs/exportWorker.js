@@ -2,6 +2,7 @@ import prisma from '../lib/prisma.js';
 import { getAuthClient, extractImageElements } from '../services/googleSlides.js';
 import { exportSlidesFromPdf, fetchSlideImage, fetchImageAsset } from '../services/imageExport.js';
 import { saveSlideImage, saveOverlayGif } from '../services/storage.js';
+import { extractBgColorFromPng } from '../services/colorExtract.js';
 
 /**
  * Process a slide export directly (no Redis/BullMQ dependency).
@@ -13,6 +14,9 @@ async function processExport({ deckId, userId, presentationId, pages, pageWidth,
   try {
     const authClient = await getAuthClient(userId);
     const accessToken = authClient.credentials.access_token;
+
+    // Track first slide buffer for background color extraction
+    let firstSlideBuffer = null;
 
     // Try PDF export for high-res slides, fall back to thumbnail API
     let pdfSlideBuffers = null;
@@ -44,6 +48,8 @@ async function processExport({ deckId, userId, presentationId, pages, pageWidth,
         update: { imageUrl, imageData: imageBuffer },
         create: { deckId, index: i, imageUrl, imageData: imageBuffer },
       });
+
+      if (i === 0) firstSlideBuffer = imageBuffer;
 
       // Extract image elements and check for GIFs
       const imageElements = extractImageElements(page.elements || [], pageWidth, pageHeight);
@@ -82,6 +88,13 @@ async function processExport({ deckId, userId, presentationId, pages, pageWidth,
       }
     }
 
+    // Extract background color from first slide image
+    let bgColor = null;
+    if (firstSlideBuffer) {
+      bgColor = extractBgColorFromPng(firstSlideBuffer);
+      console.log(`[Export] Extracted background color: ${bgColor || 'none'}`);
+    }
+
     // Mark deck as done
     await prisma.deck.update({
       where: { id: deckId },
@@ -89,6 +102,7 @@ async function processExport({ deckId, userId, presentationId, pages, pageWidth,
         exportStatus: 'done',
         exportedAt: new Date(),
         slideCount: pages.length,
+        bgColor,
       },
     });
 
