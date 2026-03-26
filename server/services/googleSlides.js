@@ -51,16 +51,42 @@ export async function getPresentationMetadata(authClient, presentationId) {
   const pageWidth = presentation.pageSize?.width?.magnitude || 9144000;
   const pageHeight = presentation.pageSize?.height?.magnitude || 5143500;
 
+  // Extract background color from the first slide
+  const bgColor = extractBgColor(presentation.slides?.[0]);
+
   return {
     title: presentation.title,
     slideCount: presentation.slides?.length || 0,
     pageWidth,
     pageHeight,
+    bgColor,
     pages: presentation.slides?.map((slide) => ({
       objectId: slide.objectId,
       elements: slide.pageElements || [],
     })) || [],
   };
+}
+
+/**
+ * Extract the background color from a slide as a hex string.
+ * Falls back to null if no solid background is found.
+ */
+function extractBgColor(slide) {
+  if (!slide) return null;
+
+  const fill =
+    slide.slideProperties?.notesPage?.pageProperties?.pageBackgroundFill ||
+    slide.pageProperties?.pageBackgroundFill ||
+    slide.slideProperties?.pageBackgroundFill;
+
+  if (!fill?.solidFill?.color?.rgbColor) return null;
+
+  const { red = 0, green = 0, blue = 0 } = fill.solidFill.color.rgbColor;
+  const r = Math.round(red * 255).toString(16).padStart(2, '0');
+  const g = Math.round(green * 255).toString(16).padStart(2, '0');
+  const b = Math.round(blue * 255).toString(16).padStart(2, '0');
+
+  return `#${r}${g}${b}`;
 }
 
 /**

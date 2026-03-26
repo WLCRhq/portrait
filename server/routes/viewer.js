@@ -29,7 +29,7 @@ async function resolveLink(slug) {
     where: { slug },
     include: {
       deck: {
-        select: { id: true, title: true, slideCount: true, exportStatus: true },
+        select: { id: true, title: true, slideCount: true, exportStatus: true, bgColor: true },
       },
     },
   });
@@ -82,6 +82,7 @@ router.get('/:slug/meta', async (req, res) => {
     deckId: link.deck.id,
     title: link.deck.title,
     slideCount: link.deck.slideCount,
+    bgColor: link.deck.bgColor,
   });
 });
 

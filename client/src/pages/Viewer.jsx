@@ -26,6 +26,14 @@ export default function Viewer() {
       });
   }, [slug]);
 
+  // Set body background color to match the presentation
+  useEffect(() => {
+    if (!meta?.bgColor) return;
+    const prev = document.body.style.backgroundColor;
+    document.body.style.backgroundColor = meta.bgColor;
+    return () => { document.body.style.backgroundColor = prev; };
+  }, [meta]);
+
   // Fetch overlays when slide changes
   useEffect(() => {
     if (!meta) return;
@@ -137,7 +145,7 @@ export default function Viewer() {
   return (
     <div style={{
       display: 'flex', flexDirection: 'column', height: '100vh',
-      background: '#000', color: '#fff', userSelect: 'none',
+      background: meta.bgColor || '#000', color: '#fff', userSelect: 'none',
     }}>
       {/* Progress bar */}
       <div style={{ height: 3, background: '#333', flexShrink: 0 }}>

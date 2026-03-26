@@ -27,6 +27,7 @@ model Deck {
   slideCount   Int       @default(0)
   exportedAt   DateTime?
   exportStatus String    @default("pending")
+  bgColor      String?
   createdAt    DateTime  @default(now())
   slides       Slide[]
   links        ShareLink[]

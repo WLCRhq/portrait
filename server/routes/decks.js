@@ -33,6 +33,7 @@ router.post('/', async (req, res) => {
         title: metadata.title,
         slideCount: metadata.slideCount,
         exportStatus: 'processing',
+        bgColor: metadata.bgColor,
       },
     });
 
@@ -127,6 +128,7 @@ router.post('/:deckId/reexport', async (req, res) => {
         slideCount: metadata.slideCount,
         exportStatus: 'processing',
         exportedAt: null,
+        bgColor: metadata.bgColor,
       },
     });
 
