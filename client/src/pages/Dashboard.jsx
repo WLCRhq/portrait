@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useDecks } from '../hooks/useDecks.js';
-import { Plus, Trash2, RefreshCw, BarChart3, Link2, LogOut } from 'lucide-react';
+import { Plus, Trash2, RefreshCw, BarChart3, Link2, LogOut, Loader } from 'lucide-react';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -10,6 +10,7 @@ export default function Dashboard() {
   const [user, setUser] = useState(null);
   const [importUrl, setImportUrl] = useState('');
   const [importing, setImporting] = useState(false);
+  const [refreshingId, setRefreshingId] = useState(null);
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -18,12 +19,12 @@ export default function Dashboard() {
       .catch(() => navigate('/'));
   }, [navigate]);
 
-  // Poll for processing decks
+  // Poll for processing decks (slower interval to reduce flashing)
   useEffect(() => {
     const processing = decks.filter((d) => d.exportStatus === 'processing');
     if (processing.length === 0) return;
 
-    const interval = setInterval(() => fetchDecks(), 2000);
+    const interval = setInterval(() => fetchDecks(), 4000);
     return () => clearInterval(interval);
   }, [decks, fetchDecks]);
 
@@ -42,20 +43,20 @@ export default function Dashboard() {
     setImporting(false);
   };
 
+  const handleReexport = async (deckId) => {
+    setRefreshingId(deckId);
+    try {
+      await axios.post(`/api/decks/${deckId}/reexport`, {}, { withCredentials: true });
+      await fetchDecks();
+    } catch {
+      // handle silently
+    }
+    setRefreshingId(null);
+  };
+
   const handleLogout = async () => {
     await axios.get('/auth/logout', { withCredentials: true });
     navigate('/');
-  };
-
-  const statusBadge = (status) => {
-    const map = {
-      done: { cls: 'badge-success', label: 'Ready' },
-      processing: { cls: 'badge-warning', label: 'Processing...' },
-      pending: { cls: 'badge-warning', label: 'Pending' },
-      error: { cls: 'badge-danger', label: 'Error' },
-    };
-    const s = map[status] || map.pending;
-    return <span className={`badge ${s.cls}`}>{s.label}</span>;
   };
 
   return (
@@ -103,42 +104,93 @@ export default function Dashboard() {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {decks.map((deck) => (
-            <div key={deck.id} className="card" style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                  <h3 style={{ fontSize: 16 }}>{deck.title}</h3>
-                  {statusBadge(deck.exportStatus)}
+            <div key={deck.id} className="card" style={{ padding: 0, overflow: 'hidden' }}>
+              {/* Processing progress bar */}
+              {deck.exportStatus === 'processing' && (
+                <div style={{ height: 3, background: 'var(--border)', overflow: 'hidden' }}>
+                  <div style={{
+                    height: '100%',
+                    background: 'var(--accent)',
+                    width: '40%',
+                    animation: 'progressSlide 1.5s ease-in-out infinite',
+                  }} />
                 </div>
-                <p style={{ fontSize: 13 }}>
-                  {deck.slideCount} slides &middot; Imported {new Date(deck.createdAt).toLocaleDateString()}
-                  {deck._count?.links > 0 && ` \u00b7 ${deck._count.links} link${deck._count.links > 1 ? 's' : ''}`}
-                </p>
-              </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                {deck.exportStatus === 'done' && (
-                  <>
-                    <Link to={`/dashboard/decks/${deck.id}`} className="btn btn-secondary btn-sm">
-                      <BarChart3 size={14} /> Analytics
-                    </Link>
-                    <Link to={`/dashboard/decks/${deck.id}/links`} className="btn btn-secondary btn-sm">
-                      <Link2 size={14} /> Links
-                    </Link>
-                    <button className="btn btn-secondary btn-sm" onClick={async () => {
-                      await axios.post(`/api/decks/${deck.id}/reexport`, {}, { withCredentials: true });
-                      fetchDecks();
-                    }} title="Re-sync from Google Slides">
-                      <RefreshCw size={14} /> Refresh
+              )}
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: 16 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                    <h3 style={{ fontSize: 16 }}>{deck.title}</h3>
+                    {deck.exportStatus === 'done' && (
+                      <span className="badge badge-success">Ready</span>
+                    )}
+                    {deck.exportStatus === 'error' && (
+                      <span className="badge badge-danger">Error</span>
+                    )}
+                    {deck.exportStatus === 'processing' && (
+                      <span className="badge badge-warning" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <Loader size={10} style={{ animation: 'spin 1s linear infinite' }} />
+                        Exporting slides...
+                      </span>
+                    )}
+                    {deck.exportStatus === 'pending' && (
+                      <span className="badge badge-warning">Pending</span>
+                    )}
+                  </div>
+                  <p style={{ fontSize: 13 }}>
+                    {deck.slideCount} slides
+                    {deck.user?.name && ` \u00b7 by ${deck.user.name}`}
+                    {' \u00b7 '}{new Date(deck.createdAt).toLocaleDateString()}
+                    {deck._count?.links > 0 && ` \u00b7 ${deck._count.links} link${deck._count.links > 1 ? 's' : ''}`}
+                  </p>
+                  {deck.exportStatus === 'processing' && (
+                    <p style={{ fontSize: 12, color: 'var(--accent)', marginTop: 4 }}>
+                      Exporting high-resolution slides from Google. This may take a minute...
+                    </p>
+                  )}
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {deck.exportStatus === 'done' && (
+                    <>
+                      <Link to={`/dashboard/decks/${deck.id}`} className="btn btn-secondary btn-sm">
+                        <BarChart3 size={14} /> Analytics
+                      </Link>
+                      <Link to={`/dashboard/decks/${deck.id}/links`} className="btn btn-secondary btn-sm">
+                        <Link2 size={14} /> Links
+                      </Link>
+                    </>
+                  )}
+                  {(deck.exportStatus === 'done' || deck.exportStatus === 'error') && (
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => handleReexport(deck.id)}
+                      disabled={refreshingId === deck.id}
+                      title="Re-sync from Google Slides"
+                    >
+                      <RefreshCw size={14} style={refreshingId === deck.id ? { animation: 'spin 1s linear infinite' } : {}} />
+                      {refreshingId === deck.id ? 'Syncing...' : 'Refresh'}
                     </button>
-                  </>
-                )}
-                <button className="btn btn-danger btn-sm" onClick={() => deleteDeck(deck.id)}>
-                  <Trash2 size={14} />
-                </button>
+                  )}
+                  <button className="btn btn-danger btn-sm" onClick={() => deleteDeck(deck.id)}>
+                    <Trash2 size={14} />
+                  </button>
+                </div>
               </div>
             </div>
           ))}
         </div>
       )}
+
+      <style>{`
+        @keyframes progressSlide {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(350%); }
+        }
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 }
