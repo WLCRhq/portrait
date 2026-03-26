@@ -101,6 +101,55 @@ router.delete('/:deckId', async (req, res) => {
   res.json({ message: 'Deck deleted' });
 });
 
+// POST /api/decks/:deckId/reexport — Re-export slides from Google (keeps links intact)
+router.post('/:deckId/reexport', async (req, res) => {
+  try {
+    const deck = await prisma.deck.findFirst({
+      where: { id: req.params.deckId, userId: req.session.userId },
+    });
+
+    if (!deck) {
+      return res.status(404).json({ error: 'Deck not found' });
+    }
+
+    const authClient = await getAuthClient(req.session.userId);
+    const metadata = await getPresentationMetadata(authClient, deck.googleId);
+
+    // Clear old slides, overlays, and images from disk
+    await prisma.slideOverlay.deleteMany({
+      where: { slide: { deckId: deck.id } },
+    });
+    await prisma.slide.deleteMany({ where: { deckId: deck.id } });
+    await deleteDeckImages(deck.id);
+
+    // Update deck metadata and set status to processing
+    await prisma.deck.update({
+      where: { id: deck.id },
+      data: {
+        title: metadata.title,
+        slideCount: metadata.slideCount,
+        exportStatus: 'processing',
+        exportedAt: null,
+      },
+    });
+
+    // Queue fresh export
+    await exportQueue.add('export-slides', {
+      deckId: deck.id,
+      userId: req.session.userId,
+      presentationId: deck.googleId,
+      pages: metadata.pages,
+      pageWidth: metadata.pageWidth,
+      pageHeight: metadata.pageHeight,
+    });
+
+    res.json({ message: 'Re-export started', slideCount: metadata.slideCount });
+  } catch (err) {
+    console.error('Deck re-export error:', err);
+    res.status(500).json({ error: 'Failed to re-export presentation' });
+  }
+});
+
 // GET /api/decks/:deckId/slides/:index/image — Serve slide image
 router.get('/:deckId/slides/:index/image', async (req, res) => {
   const deck = await prisma.deck.findFirst({

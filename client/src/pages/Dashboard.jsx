@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useDecks } from '../hooks/useDecks.js';
-import { Plus, Trash2, ExternalLink, BarChart3, Link2, LogOut } from 'lucide-react';
+import { Plus, Trash2, RefreshCw, BarChart3, Link2, LogOut } from 'lucide-react';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -123,6 +123,12 @@ export default function Dashboard() {
                     <Link to={`/dashboard/decks/${deck.id}/links`} className="btn btn-secondary btn-sm">
                       <Link2 size={14} /> Links
                     </Link>
+                    <button className="btn btn-secondary btn-sm" onClick={async () => {
+                      await axios.post(`/api/decks/${deck.id}/reexport`, {}, { withCredentials: true });
+                      fetchDecks();
+                    }} title="Re-sync from Google Slides">
+                      <RefreshCw size={14} /> Refresh
+                    </button>
                   </>
                 )}
                 <button className="btn btn-danger btn-sm" onClick={() => deleteDeck(deck.id)}>

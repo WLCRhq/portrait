@@ -1,6 +1,7 @@
 import { useParams, Link } from 'react-router-dom';
 import { useAnalytics } from '../hooks/useAnalytics.js';
-import { ArrowLeft, Link2, Users, Clock, Eye, TrendingDown } from 'lucide-react';
+import axios from 'axios';
+import { ArrowLeft, Link2, Users, Clock, Eye, TrendingDown, RefreshCw } from 'lucide-react';
 import TimePerSlideChart from '../components/AnalyticsCharts/TimePerSlideChart.jsx';
 import DropOffFunnel from '../components/AnalyticsCharts/DropOffFunnel.jsx';
 import EngagementHeatmap from '../components/AnalyticsCharts/EngagementHeatmap.jsx';
@@ -44,6 +45,12 @@ export default function DeckDetail() {
         <Link to={`/dashboard/decks/${deckId}/links`} className="btn btn-secondary btn-sm">
           <Link2 size={14} /> Manage Links
         </Link>
+        <button className="btn btn-secondary btn-sm" onClick={async () => {
+          await axios.post(`/api/decks/${deckId}/reexport`, {}, { withCredentials: true });
+          refetch();
+        }} title="Re-sync slides from Google Slides">
+          <RefreshCw size={14} /> Re-sync Slides
+        </button>
         <button className="btn btn-secondary btn-sm" onClick={refetch}>Refresh</button>
       </header>
 
