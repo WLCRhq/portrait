@@ -50,11 +50,11 @@ const worker = new Worker('slide-export', async (job) => {
 
       const imageUrl = await saveSlideImage(deckId, i, imageBuffer);
 
-      // Upsert slide record
+      // Upsert slide record — store image data in DB for persistence
       const slide = await prisma.slide.upsert({
         where: { deckId_index: { deckId, index: i } },
-        update: { imageUrl },
-        create: { deckId, index: i, imageUrl },
+        update: { imageUrl, imageData: imageBuffer },
+        create: { deckId, index: i, imageUrl, imageData: imageBuffer },
       });
 
       // Extract image elements and check for GIFs
@@ -73,6 +73,7 @@ const worker = new Worker('slide-export', async (job) => {
               data: {
                 slideId: slide.id,
                 imageUrl: gifUrl,
+                imageData: result.buffer,
                 x: img.x,
                 y: img.y,
                 width: img.width,

@@ -39,6 +39,7 @@ model Slide {
   deck      Deck           @relation(fields: [deckId], references: [id], onDelete: Cascade)
   index     Int
   imageUrl  String
+  imageData Bytes?
   createdAt DateTime       @default(now())
   overlays  SlideOverlay[]
 
@@ -50,6 +51,7 @@ model SlideOverlay {
   slideId    String
   slide      Slide  @relation(fields: [slideId], references: [id], onDelete: Cascade)
   imageUrl   String
+  imageData  Bytes?
   x          Float
   y          Float
   width      Float

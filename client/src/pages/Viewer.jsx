@@ -250,7 +250,7 @@ export default function Viewer() {
               return (
                 <img
                   key={overlay.id}
-                  src={`${overlay.imageUrl}${cacheBust}`}
+                  src={`${overlay.dbImageUrl || overlay.imageUrl}${cacheBust}`}
                   alt=""
                   style={{
                     position: 'absolute',
@@ -286,7 +286,7 @@ export default function Viewer() {
                 }}
               >
                 <img
-                  src={`${overlay.imageUrl}${cacheBust}`}
+                  src={`${overlay.dbImageUrl || overlay.imageUrl}${cacheBust}`}
                   alt=""
                   style={{
                     position: 'absolute',
