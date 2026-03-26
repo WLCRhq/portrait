@@ -158,27 +158,14 @@ router.get('/:deckId/slides/:index/image', async (req, res) => {
     return res.status(404).json({ error: 'Deck not found' });
   }
 
-  const slideIndex = parseInt(req.params.index);
-  const imagePath = getSlideImagePath(deck.id, slideIndex);
+  const imagePath = getSlideImagePath(deck.id, parseInt(req.params.index));
 
-  // Try filesystem first, fall back to database
-  if (fs.existsSync(imagePath)) {
-    res.setHeader('Cache-Control', 'public, max-age=3600');
-    return res.sendFile(path.resolve(imagePath));
-  }
-
-  const slide = await prisma.slide.findUnique({
-    where: { deckId_index: { deckId: deck.id, index: slideIndex } },
-    select: { imageData: true },
-  });
-
-  if (!slide?.imageData) {
+  if (!fs.existsSync(imagePath)) {
     return res.status(404).json({ error: 'Slide image not found' });
   }
 
-  res.setHeader('Content-Type', 'image/png');
   res.setHeader('Cache-Control', 'public, max-age=3600');
-  res.send(slide.imageData);
+  res.sendFile(path.resolve(imagePath));
 });
 
 export default router;

@@ -153,30 +153,13 @@ router.get('/:slug/slide/:index/overlays', async (req, res) => {
 
   const slide = await prisma.slide.findUnique({
     where: { deckId_index: { deckId: link.deck.id, index: slideIndex } },
-    include: {
-      overlays: {
-        orderBy: { zIndex: 'asc' },
-        select: {
-          id: true, imageUrl: true, x: true, y: true,
-          width: true, height: true, zIndex: true,
-          cropTop: true, cropBottom: true, cropLeft: true, cropRight: true,
-          imageData: false, // don't send binary in JSON
-        },
-      },
-    },
+    include: { overlays: { orderBy: { zIndex: 'asc' } } },
   });
 
-  // Provide a DB-backed URL for each overlay as fallback
-  const overlays = (slide?.overlays || []).map((o) => ({
-    ...o,
-    imageUrl: o.imageUrl,
-    dbImageUrl: `/api/view/${req.params.slug}/overlay/${o.id}`,
-  }));
-
-  res.json(overlays);
+  res.json(slide?.overlays || []);
 });
 
-// GET /api/view/:slug/slide/:index — Serve slide image (public, authenticated by slug)
+// GET /api/view/:slug/slide/:index — Serve slide image from disk
 router.get('/:slug/slide/:index', async (req, res) => {
   const result = await resolveLink(req.params.slug);
   if (result.error) {
@@ -184,49 +167,14 @@ router.get('/:slug/slide/:index', async (req, res) => {
   }
 
   const { link } = result;
-  const slideIndex = parseInt(req.params.index);
+  const imagePath = getSlideImagePath(link.deck.id, parseInt(req.params.index));
 
-  // Try filesystem first (fast), fall back to database
-  const imagePath = getSlideImagePath(link.deck.id, slideIndex);
-  if (fs.existsSync(imagePath)) {
-    res.setHeader('Cache-Control', 'public, max-age=3600');
-    return res.sendFile(path.resolve(imagePath));
-  }
-
-  // Serve from database
-  const slide = await prisma.slide.findUnique({
-    where: { deckId_index: { deckId: link.deck.id, index: slideIndex } },
-    select: { imageData: true },
-  });
-
-  if (!slide?.imageData) {
+  if (!fs.existsSync(imagePath)) {
     return res.status(404).json({ error: 'Slide image not found' });
   }
 
-  res.setHeader('Content-Type', 'image/png');
   res.setHeader('Cache-Control', 'public, max-age=3600');
-  res.send(slide.imageData);
-});
-
-// GET /api/view/:slug/overlay/:overlayId — Serve overlay image from DB
-router.get('/:slug/overlay/:overlayId', async (req, res) => {
-  const result = await resolveLink(req.params.slug);
-  if (result.error) {
-    return res.status(result.status).json({ error: result.error });
-  }
-
-  const overlay = await prisma.slideOverlay.findUnique({
-    where: { id: req.params.overlayId },
-    select: { imageData: true },
-  });
-
-  if (!overlay?.imageData) {
-    return res.status(404).json({ error: 'Overlay not found' });
-  }
-
-  res.setHeader('Content-Type', 'image/gif');
-  res.setHeader('Cache-Control', 'public, max-age=3600');
-  res.send(overlay.imageData);
+  res.sendFile(path.resolve(imagePath));
 });
 
 export default router;

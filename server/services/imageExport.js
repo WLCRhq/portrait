@@ -23,7 +23,7 @@ export async function exportSlidesFromPdf(authClient, presentationId, slideCount
 
   // Convert each PDF page to a high-res PNG
   const pages = [];
-  const pdfPages = await pdf(pdfBuffer, { scale: 3.0 }); // 3x scale for ~2700px+ width
+  const pdfPages = await pdf(pdfBuffer, { scale: 2.0 }); // 2x scale for ~1920px+ width
 
   for await (const page of pdfPages) {
     pages.push(Buffer.from(page));

@@ -42,11 +42,11 @@ async function processExport({ deckId, userId, presentationId, pages, pageWidth,
 
       const imageUrl = await saveSlideImage(deckId, i, imageBuffer);
 
-      // Upsert slide record — store image data in DB for persistence
+      // Upsert slide record (images stored on disk, not in DB)
       const slide = await prisma.slide.upsert({
         where: { deckId_index: { deckId, index: i } },
-        update: { imageUrl, imageData: imageBuffer },
-        create: { deckId, index: i, imageUrl, imageData: imageBuffer },
+        update: { imageUrl },
+        create: { deckId, index: i, imageUrl },
       });
 
       if (i === 0) firstSlideBuffer = imageBuffer;
@@ -67,7 +67,6 @@ async function processExport({ deckId, userId, presentationId, pages, pageWidth,
               data: {
                 slideId: slide.id,
                 imageUrl: gifUrl,
-                imageData: result.buffer,
                 x: img.x,
                 y: img.y,
                 width: img.width,
