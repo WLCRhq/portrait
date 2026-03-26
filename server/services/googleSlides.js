@@ -106,8 +106,7 @@ export function extractImageElements(pageElements, pageWidth, pageHeight) {
 }
 
 /**
- * Get thumbnail URL for a specific slide page.
- * Requests LARGE (1600px) then upgrades to higher res via URL manipulation.
+ * Get thumbnail URL for a specific slide page (1600px fallback).
  */
 export async function getSlideThumbnailUrl(authClient, presentationId, pageObjectId) {
   const slides = google.slides({ version: 'v1', auth: authClient });
@@ -117,15 +116,5 @@ export async function getSlideThumbnailUrl(authClient, presentationId, pageObjec
     'thumbnailProperties.thumbnailSize': 'LARGE',
   });
 
-  let url = res.data.contentUrl;
-
-  // Google image URLs support size params — try to get higher resolution
-  // Replace =s1600 with =s3200 for 2x resolution, or append if not present
-  if (url.includes('=s')) {
-    url = url.replace(/=s\d+/, '=s3200');
-  } else if (url.includes('?')) {
-    url += '&sz=s3200';
-  }
-
-  return url;
+  return res.data.contentUrl;
 }

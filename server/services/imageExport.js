@@ -1,7 +1,41 @@
+import { google } from 'googleapis';
+import { pdf } from 'pdf-to-img';
 import { getSlideThumbnailUrl } from './googleSlides.js';
 
 /**
- * Fetch the actual PNG image bytes from a Google Slides thumbnail URL.
+ * Export a presentation as PDF via Google Drive API, then convert
+ * each page to a high-resolution PNG.
+ * Returns an array of Buffers (one per slide).
+ */
+export async function exportSlidesFromPdf(authClient, presentationId, slideCount) {
+  const drive = google.drive({ version: 'v3', auth: authClient });
+
+  // Export the entire presentation as PDF
+  const res = await drive.files.export({
+    fileId: presentationId,
+    mimeType: 'application/pdf',
+  }, {
+    responseType: 'arraybuffer',
+  });
+
+  const pdfBuffer = Buffer.from(res.data);
+  console.log(`[ImageExport] PDF downloaded: ${(pdfBuffer.length / 1024 / 1024).toFixed(1)} MB`);
+
+  // Convert each PDF page to a high-res PNG
+  const pages = [];
+  const pdfPages = await pdf(pdfBuffer, { scale: 3.0 }); // 3x scale for ~2700px+ width
+
+  for await (const page of pdfPages) {
+    pages.push(Buffer.from(page));
+  }
+
+  console.log(`[ImageExport] Converted ${pages.length} pages from PDF`);
+
+  return pages;
+}
+
+/**
+ * Fallback: Fetch slide image via Thumbnail API (1600px max).
  */
 export async function fetchSlideImage(authClient, presentationId, pageObjectId) {
   const thumbnailUrl = await getSlideThumbnailUrl(authClient, presentationId, pageObjectId);

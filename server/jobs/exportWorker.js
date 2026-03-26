@@ -2,7 +2,7 @@ import { Queue, Worker } from 'bullmq';
 import IORedis from 'ioredis';
 import prisma from '../lib/prisma.js';
 import { getAuthClient, extractImageElements } from '../services/googleSlides.js';
-import { fetchSlideImage, fetchImageAsset } from '../services/imageExport.js';
+import { exportSlidesFromPdf, fetchSlideImage, fetchImageAsset } from '../services/imageExport.js';
 import { saveSlideImage, saveOverlayGif } from '../services/storage.js';
 
 const connection = new IORedis(process.env.REDIS_URL || 'redis://localhost:6379', {
@@ -26,12 +26,28 @@ const worker = new Worker('slide-export', async (job) => {
     const authClient = await getAuthClient(userId);
     const accessToken = authClient.credentials.access_token;
 
+    // Try PDF export for high-res slides, fall back to thumbnail API
+    let pdfSlideBuffers = null;
+    try {
+      console.log(`[ExportWorker] Attempting PDF export for high-res slides...`);
+      pdfSlideBuffers = await exportSlidesFromPdf(authClient, presentationId, pages.length);
+      console.log(`[ExportWorker] PDF export succeeded: ${pdfSlideBuffers.length} pages`);
+    } catch (err) {
+      console.warn(`[ExportWorker] PDF export failed, falling back to thumbnails:`, err.message);
+    }
+
     for (let i = 0; i < pages.length; i++) {
       const page = pages[i];
-      console.log(`[ExportWorker] Exporting slide ${i + 1}/${pages.length}`);
+      console.log(`[ExportWorker] Processing slide ${i + 1}/${pages.length}`);
 
-      // Fetch PNG thumbnail
-      const imageBuffer = await fetchSlideImage(authClient, presentationId, page.objectId);
+      // Use PDF page if available, otherwise fall back to thumbnail
+      let imageBuffer;
+      if (pdfSlideBuffers && pdfSlideBuffers[i]) {
+        imageBuffer = pdfSlideBuffers[i];
+      } else {
+        imageBuffer = await fetchSlideImage(authClient, presentationId, page.objectId);
+      }
+
       const imageUrl = await saveSlideImage(deckId, i, imageBuffer);
 
       // Upsert slide record
@@ -46,7 +62,6 @@ const worker = new Worker('slide-export', async (job) => {
       let overlayIndex = 0;
 
       for (const img of imageElements) {
-        // Try contentUrl first (Google-hosted), then sourceUrl (original)
         const urls = [img.contentUrl, img.sourceUrl].filter(Boolean);
 
         for (const url of urls) {
@@ -72,7 +87,7 @@ const worker = new Worker('slide-export', async (job) => {
 
             console.log(`[ExportWorker] Found GIF overlay on slide ${i + 1} at (${img.x.toFixed(1)}%, ${img.y.toFixed(1)}%)`);
             overlayIndex++;
-            break; // Don't try sourceUrl if contentUrl worked
+            break;
           }
         }
       }
