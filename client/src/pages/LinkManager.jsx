@@ -71,16 +71,19 @@ export default function LinkManager() {
       {/* Create form */}
       <div className="card" style={{ marginBottom: 24 }}>
         <h3 style={{ fontSize: 16, marginBottom: 12 }}>Create New Link</h3>
-        <form onSubmit={createLink} style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <input
-            type="text"
-            value={label}
-            onChange={(e) => setLabel(e.target.value)}
-            placeholder="Label (e.g. Sent to Acme Corp)"
-            style={{ flex: '1 1 200px' }}
-          />
+        <form onSubmit={createLink} style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+          <div style={{ flex: '1 1 200px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-h)' }}>Label</label>
+            <input
+              type="text"
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+              placeholder="e.g. Sent to Acme Corp"
+              style={{ width: '100%' }}
+            />
+          </div>
           <div style={{ flex: '0 1 220px', display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--text)' }}>Expiration Date</label>
+            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-h)' }}>Expiration Date</label>
             <input
               type="datetime-local"
               value={expiresAt}
