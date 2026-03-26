@@ -79,12 +79,15 @@ export default function LinkManager() {
             placeholder="Label (e.g. Sent to Acme Corp)"
             style={{ flex: '1 1 200px' }}
           />
-          <input
-            type="datetime-local"
-            value={expiresAt}
-            onChange={(e) => setExpiresAt(e.target.value)}
-            style={{ flex: '0 1 220px' }}
-          />
+          <div style={{ flex: '0 1 220px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--text)' }}>Expiration Date</label>
+            <input
+              type="datetime-local"
+              value={expiresAt}
+              onChange={(e) => setExpiresAt(e.target.value)}
+              style={{ width: '100%' }}
+            />
+          </div>
           <button type="submit" className="btn btn-primary" disabled={creating}>
             <Plus size={16} /> {creating ? 'Creating...' : 'Create Link'}
           </button>
