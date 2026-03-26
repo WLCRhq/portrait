@@ -160,17 +160,15 @@ export default function Dashboard() {
                       </Link>
                     </>
                   )}
-                  {(deck.exportStatus === 'done' || deck.exportStatus === 'error') && (
-                    <button
-                      className="btn btn-secondary btn-sm"
-                      onClick={() => handleReexport(deck.id)}
-                      disabled={refreshingId === deck.id}
-                      title="Re-sync from Google Slides"
-                    >
-                      <RefreshCw size={14} style={refreshingId === deck.id ? { animation: 'spin 1s linear infinite' } : {}} />
-                      {refreshingId === deck.id ? 'Syncing...' : 'Refresh'}
-                    </button>
-                  )}
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => handleReexport(deck.id)}
+                    disabled={refreshingId === deck.id}
+                    title={deck.exportStatus === 'processing' ? 'Cancel and re-sync' : 'Re-sync from Google Slides'}
+                  >
+                    <RefreshCw size={14} style={refreshingId === deck.id ? { animation: 'spin 1s linear infinite' } : {}} />
+                    {refreshingId === deck.id ? 'Syncing...' : deck.exportStatus === 'processing' ? 'Restart' : 'Refresh'}
+                  </button>
                   <button className="btn btn-danger btn-sm" onClick={() => deleteDeck(deck.id)}>
                     <Trash2 size={14} />
                   </button>
