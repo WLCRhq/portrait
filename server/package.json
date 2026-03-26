@@ -12,7 +12,6 @@
   },
   "dependencies": {
     "@prisma/client": "^6.19.2",
-    "bullmq": "^5.71.0",
     "connect-pg-simple": "^10.0.0",
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",
@@ -23,7 +22,6 @@
     "google-auth-library": "^10.6.2",
     "googleapis": "^171.4.0",
     "helmet": "^8.1.0",
-    "ioredis": "^5.10.1",
     "morgan": "^1.10.1",
     "nanoid": "^5.1.7",
     "pdf-to-img": "^5.0.0",

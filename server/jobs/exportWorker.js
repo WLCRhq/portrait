@@ -1,26 +1,14 @@
-import { Queue, Worker } from 'bullmq';
-import IORedis from 'ioredis';
 import prisma from '../lib/prisma.js';
 import { getAuthClient, extractImageElements } from '../services/googleSlides.js';
 import { exportSlidesFromPdf, fetchSlideImage, fetchImageAsset } from '../services/imageExport.js';
 import { saveSlideImage, saveOverlayGif } from '../services/storage.js';
 
-const connection = new IORedis(process.env.REDIS_URL || 'redis://localhost:6379', {
-  maxRetriesPerRequest: null,
-});
-
-export const exportQueue = new Queue('slide-export', {
-  connection,
-  defaultJobOptions: {
-    removeOnComplete: true,
-    removeOnFail: { count: 5 },
-  },
-});
-
-const worker = new Worker('slide-export', async (job) => {
-  const { deckId, userId, presentationId, pages, pageWidth, pageHeight } = job.data;
-
-  console.log(`[ExportWorker] Starting export for deck ${deckId} (${pages.length} slides)`);
+/**
+ * Process a slide export directly (no Redis/BullMQ dependency).
+ * Runs in the background via a detached promise.
+ */
+async function processExport({ deckId, userId, presentationId, pages, pageWidth, pageHeight }) {
+  console.log(`[Export] Starting export for deck ${deckId} (${pages.length} slides)`);
 
   try {
     const authClient = await getAuthClient(userId);
@@ -29,16 +17,16 @@ const worker = new Worker('slide-export', async (job) => {
     // Try PDF export for high-res slides, fall back to thumbnail API
     let pdfSlideBuffers = null;
     try {
-      console.log(`[ExportWorker] Attempting PDF export for high-res slides...`);
+      console.log(`[Export] Attempting PDF export for high-res slides...`);
       pdfSlideBuffers = await exportSlidesFromPdf(authClient, presentationId, pages.length);
-      console.log(`[ExportWorker] PDF export succeeded: ${pdfSlideBuffers.length} pages`);
+      console.log(`[Export] PDF export succeeded: ${pdfSlideBuffers.length} pages`);
     } catch (err) {
-      console.warn(`[ExportWorker] PDF export failed, falling back to thumbnails:`, err.message);
+      console.warn(`[Export] PDF export failed, falling back to thumbnails:`, err.message);
     }
 
     for (let i = 0; i < pages.length; i++) {
       const page = pages[i];
-      console.log(`[ExportWorker] Processing slide ${i + 1}/${pages.length}`);
+      console.log(`[Export] Processing slide ${i + 1}/${pages.length}`);
 
       // Use PDF page if available, otherwise fall back to thumbnail
       let imageBuffer;
@@ -86,14 +74,12 @@ const worker = new Worker('slide-export', async (job) => {
               },
             });
 
-            console.log(`[ExportWorker] Found GIF overlay on slide ${i + 1} at (${img.x.toFixed(1)}%, ${img.y.toFixed(1)}%)`);
+            console.log(`[Export] Found GIF overlay on slide ${i + 1} at (${img.x.toFixed(1)}%, ${img.y.toFixed(1)}%)`);
             overlayIndex++;
             break;
           }
         }
       }
-
-      await job.updateProgress(Math.round(((i + 1) / pages.length) * 100));
     }
 
     // Mark deck as done
@@ -106,24 +92,27 @@ const worker = new Worker('slide-export', async (job) => {
       },
     });
 
-    console.log(`[ExportWorker] Export complete for deck ${deckId}`);
+    console.log(`[Export] Export complete for deck ${deckId}`);
   } catch (err) {
-    console.error(`[ExportWorker] Export failed for deck ${deckId}:`, err);
+    console.error(`[Export] Export failed for deck ${deckId}:`, err);
 
     await prisma.deck.update({
       where: { id: deckId },
       data: { exportStatus: 'error' },
     });
-
-    throw err;
   }
-}, {
-  connection,
-  concurrency: 2,
-});
+}
 
-worker.on('failed', (job, err) => {
-  console.error(`[ExportWorker] Job ${job?.id} failed:`, err.message);
-});
-
-export default worker;
+/**
+ * Queue-compatible interface: enqueue an export job.
+ * Runs directly in the background (no Redis required).
+ */
+export const exportQueue = {
+  add(_jobName, data) {
+    // Fire and forget — runs in background
+    processExport(data).catch((err) => {
+      console.error(`[Export] Unhandled error:`, err);
+    });
+    return Promise.resolve();
+  },
+};
