@@ -3,6 +3,16 @@ import { useParams } from 'react-router-dom';
 import axios from 'axios';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
+function isLightColor(hex) {
+  if (!hex) return false;
+  const c = hex.replace('#', '');
+  const r = parseInt(c.substring(0, 2), 16);
+  const g = parseInt(c.substring(2, 4), 16);
+  const b = parseInt(c.substring(4, 6), 16);
+  // Perceived brightness formula
+  return (r * 299 + g * 587 + b * 114) / 1000 > 140;
+}
+
 export default function Viewer() {
   const { slug } = useParams();
   const [meta, setMeta] = useState(null);
@@ -26,12 +36,26 @@ export default function Viewer() {
       });
   }, [slug]);
 
-  // Set body background color to match the presentation
+  // Set background color everywhere to match the presentation
   useEffect(() => {
     if (!meta?.bgColor) return;
-    const prev = document.body.style.backgroundColor;
-    document.body.style.backgroundColor = meta.bgColor;
-    return () => { document.body.style.backgroundColor = prev; };
+    const html = document.documentElement;
+    const body = document.body;
+    const root = document.getElementById('root');
+
+    const prevHtml = html.style.backgroundColor;
+    const prevBody = body.style.backgroundColor;
+    const prevRoot = root?.style.backgroundColor;
+
+    html.style.backgroundColor = meta.bgColor;
+    body.style.backgroundColor = meta.bgColor;
+    if (root) root.style.backgroundColor = meta.bgColor;
+
+    return () => {
+      html.style.backgroundColor = prevHtml;
+      body.style.backgroundColor = prevBody;
+      if (root) root.style.backgroundColor = prevRoot;
+    };
   }, [meta]);
 
   // Fetch overlays when slide changes
@@ -141,14 +165,19 @@ export default function Viewer() {
   }
 
   const progress = ((currentSlide + 1) / meta.slideCount) * 100;
+  const bg = meta.bgColor || '#000';
+  const light = isLightColor(bg);
+  const textColor = light ? '#333' : '#fff';
+  const subtleColor = light ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.5)';
+  const barTrack = light ? 'rgba(0,0,0,0.1)' : '#333';
 
   return (
     <div style={{
       display: 'flex', flexDirection: 'column', height: '100vh',
-      background: meta.bgColor || '#000', color: '#fff', userSelect: 'none',
+      background: bg, color: textColor, userSelect: 'none',
     }}>
       {/* Progress bar */}
-      <div style={{ height: 3, background: '#333', flexShrink: 0 }}>
+      <div style={{ height: 3, background: barTrack, flexShrink: 0 }}>
         <div style={{
           height: '100%', background: 'var(--accent)',
           width: `${progress}%`, transition: 'width 0.3s ease',
@@ -277,7 +306,7 @@ export default function Viewer() {
       {/* Footer */}
       <div style={{
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        padding: '8px 16px', fontSize: 13, color: '#888', flexShrink: 0,
+        padding: '8px 16px', fontSize: 13, color: subtleColor, flexShrink: 0,
       }}>
         <span>{meta.title}</span>
         <span>{currentSlide + 1} / {meta.slideCount}</span>
