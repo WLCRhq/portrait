@@ -29,7 +29,7 @@ async function resolveLink(slug) {
     where: { slug },
     include: {
       deck: {
-        select: { id: true, title: true, slideCount: true, exportStatus: true, bgColor: true },
+        select: { id: true, title: true, slideCount: true, exportStatus: true, bgColor: true, exportedAt: true },
       },
     },
   });
@@ -83,6 +83,7 @@ router.get('/:slug/meta', async (req, res) => {
     title: link.deck.title,
     slideCount: link.deck.slideCount,
     bgColor: link.deck.bgColor,
+    exportedAt: link.deck.exportedAt,
   });
 });
 
@@ -172,7 +173,7 @@ router.get('/:slug/slide/:index', async (req, res) => {
     return res.status(404).json({ error: 'Slide image not found' });
   }
 
-  res.setHeader('Cache-Control', 'public, max-age=86400');
+  res.setHeader('Cache-Control', 'public, max-age=3600');
   res.sendFile(path.resolve(imagePath));
 });
 

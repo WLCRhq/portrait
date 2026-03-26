@@ -164,7 +164,7 @@ router.get('/:deckId/slides/:index/image', async (req, res) => {
     return res.status(404).json({ error: 'Slide image not found' });
   }
 
-  res.setHeader('Cache-Control', 'public, max-age=86400');
+  res.setHeader('Cache-Control', 'public, max-age=3600');
   res.sendFile(path.resolve(imagePath));
 });
 

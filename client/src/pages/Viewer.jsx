@@ -165,6 +165,7 @@ export default function Viewer() {
   }
 
   const progress = ((currentSlide + 1) / meta.slideCount) * 100;
+  const cacheBust = meta.exportedAt ? `?v=${new Date(meta.exportedAt).getTime()}` : '';
   const bg = meta.bgColor || '#000';
   const light = isLightColor(bg);
   const textColor = light ? '#333' : '#fff';
@@ -202,7 +203,7 @@ export default function Viewer() {
           style={{ position: 'relative', maxWidth: '100%', maxHeight: '100%' }}
         >
           <img
-            src={`/api/view/${slug}/slide/${currentSlide}`}
+            src={`/api/view/${slug}/slide/${currentSlide}${cacheBust}`}
             alt={`Slide ${currentSlide + 1}`}
             style={{
               maxWidth: '100vw', maxHeight: 'calc(100vh - 40px)', objectFit: 'contain',
@@ -221,7 +222,7 @@ export default function Viewer() {
               return (
                 <img
                   key={overlay.id}
-                  src={overlay.imageUrl}
+                  src={`${overlay.imageUrl}${cacheBust}`}
                   alt=""
                   style={{
                     position: 'absolute',
@@ -259,7 +260,7 @@ export default function Viewer() {
                 }}
               >
                 <img
-                  src={overlay.imageUrl}
+                  src={`${overlay.imageUrl}${cacheBust}`}
                   alt=""
                   style={{
                     position: 'absolute',
