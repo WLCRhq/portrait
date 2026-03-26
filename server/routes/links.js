@@ -7,7 +7,7 @@ const router = Router();
 // POST /api/decks/:deckId/links — Create a new share link
 router.post('/:deckId/links', async (req, res) => {
   const deck = await prisma.deck.findFirst({
-    where: { id: req.params.deckId, userId: req.session.userId },
+    where: { id: req.params.deckId },
   });
 
   if (!deck) {
@@ -36,7 +36,7 @@ router.post('/:deckId/links', async (req, res) => {
 // GET /api/decks/:deckId/links — List all links for a deck
 router.get('/:deckId/links', async (req, res) => {
   const deck = await prisma.deck.findFirst({
-    where: { id: req.params.deckId, userId: req.session.userId },
+    where: { id: req.params.deckId },
   });
 
   if (!deck) {
@@ -57,7 +57,7 @@ router.get('/:deckId/links', async (req, res) => {
 // PATCH /api/decks/:deckId/links/:linkId — Update a link
 router.patch('/:deckId/links/:linkId', async (req, res) => {
   const deck = await prisma.deck.findFirst({
-    where: { id: req.params.deckId, userId: req.session.userId },
+    where: { id: req.params.deckId },
   });
 
   if (!deck) {
@@ -81,7 +81,7 @@ router.patch('/:deckId/links/:linkId', async (req, res) => {
 // DELETE /api/decks/:deckId/links/:linkId — Delete a link
 router.delete('/:deckId/links/:linkId', async (req, res) => {
   const deck = await prisma.deck.findFirst({
-    where: { id: req.params.deckId, userId: req.session.userId },
+    where: { id: req.params.deckId },
   });
 
   if (!deck) {

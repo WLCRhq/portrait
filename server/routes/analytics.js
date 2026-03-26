@@ -6,9 +6,9 @@ const router = Router();
 
 // GET /api/analytics/:deckId — Full analytics for a deck
 router.get('/:deckId', async (req, res) => {
-  // Verify deck belongs to user
-  const deck = await prisma.deck.findFirst({
-    where: { id: req.params.deckId, userId: req.session.userId },
+  // Verify deck exists (visible to all authenticated users)
+  const deck = await prisma.deck.findUnique({
+    where: { id: req.params.deckId },
   });
 
   if (!deck) {

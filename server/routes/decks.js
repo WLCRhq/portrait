@@ -14,7 +14,7 @@ function extractPresentationId(input) {
   return match ? match[1] : input.trim();
 }
 
-// POST /api/decks — Import a new deck
+// POST /api/decks — Import a new deck (attributed to the importing user)
 router.post('/', async (req, res) => {
   try {
     const { presentationId: rawId } = req.body;
@@ -36,7 +36,6 @@ router.post('/', async (req, res) => {
       },
     });
 
-    // Queue export job
     await exportQueue.add('export-slides', {
       deckId: deck.id,
       userId: req.session.userId,
@@ -53,12 +52,12 @@ router.post('/', async (req, res) => {
   }
 });
 
-// GET /api/decks — List all user's decks
+// GET /api/decks — List ALL decks (visible to any authenticated user)
 router.get('/', async (req, res) => {
   const decks = await prisma.deck.findMany({
-    where: { userId: req.session.userId },
     orderBy: { createdAt: 'desc' },
     include: {
+      user: { select: { name: true } },
       _count: { select: { links: true } },
     },
   });
@@ -67,11 +66,12 @@ router.get('/', async (req, res) => {
 
 // GET /api/decks/:deckId — Get single deck with slides
 router.get('/:deckId', async (req, res) => {
-  const deck = await prisma.deck.findFirst({
-    where: { id: req.params.deckId, userId: req.session.userId },
+  const deck = await prisma.deck.findUnique({
+    where: { id: req.params.deckId },
     include: {
       slides: { orderBy: { index: 'asc' } },
       links: { orderBy: { createdAt: 'desc' } },
+      user: { select: { name: true } },
     },
   });
 
@@ -84,18 +84,15 @@ router.get('/:deckId', async (req, res) => {
 
 // DELETE /api/decks/:deckId — Delete deck and associated data
 router.delete('/:deckId', async (req, res) => {
-  const deck = await prisma.deck.findFirst({
-    where: { id: req.params.deckId, userId: req.session.userId },
+  const deck = await prisma.deck.findUnique({
+    where: { id: req.params.deckId },
   });
 
   if (!deck) {
     return res.status(404).json({ error: 'Deck not found' });
   }
 
-  // Delete images from disk
   await deleteDeckImages(deck.id);
-
-  // Cascade delete handles DB records
   await prisma.deck.delete({ where: { id: deck.id } });
 
   res.json({ message: 'Deck deleted' });
@@ -104,25 +101,25 @@ router.delete('/:deckId', async (req, res) => {
 // POST /api/decks/:deckId/reexport — Re-export slides from Google (keeps links intact)
 router.post('/:deckId/reexport', async (req, res) => {
   try {
-    const deck = await prisma.deck.findFirst({
-      where: { id: req.params.deckId, userId: req.session.userId },
+    const deck = await prisma.deck.findUnique({
+      where: { id: req.params.deckId },
+      include: { user: true },
     });
 
     if (!deck) {
       return res.status(404).json({ error: 'Deck not found' });
     }
 
-    const authClient = await getAuthClient(req.session.userId);
+    // Use the original importer's credentials to access Google Slides
+    const authClient = await getAuthClient(deck.userId);
     const metadata = await getPresentationMetadata(authClient, deck.googleId);
 
-    // Clear old slides, overlays, and images from disk
     await prisma.slideOverlay.deleteMany({
       where: { slide: { deckId: deck.id } },
     });
     await prisma.slide.deleteMany({ where: { deckId: deck.id } });
     await deleteDeckImages(deck.id);
 
-    // Update deck metadata and set status to processing
     await prisma.deck.update({
       where: { id: deck.id },
       data: {
@@ -133,10 +130,9 @@ router.post('/:deckId/reexport', async (req, res) => {
       },
     });
 
-    // Queue fresh export
     await exportQueue.add('export-slides', {
       deckId: deck.id,
-      userId: req.session.userId,
+      userId: deck.userId,
       presentationId: deck.googleId,
       pages: metadata.pages,
       pageWidth: metadata.pageWidth,
@@ -152,8 +148,8 @@ router.post('/:deckId/reexport', async (req, res) => {
 
 // GET /api/decks/:deckId/slides/:index/image — Serve slide image
 router.get('/:deckId/slides/:index/image', async (req, res) => {
-  const deck = await prisma.deck.findFirst({
-    where: { id: req.params.deckId, userId: req.session.userId },
+  const deck = await prisma.deck.findUnique({
+    where: { id: req.params.deckId },
   });
 
   if (!deck) {
