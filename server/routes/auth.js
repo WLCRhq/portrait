@@ -106,8 +106,12 @@ router.get('/me', async (req, res) => {
   res.json({ ...user, csrfToken: generateCsrf(req) });
 });
 
-// Logout
+// Logout (CSRF-protected)
 router.post('/logout', (req, res) => {
+  const token = req.headers['x-csrf-token'];
+  if (!token || token !== req.session?.csrfToken) {
+    return res.status(403).json({ error: 'Invalid CSRF token' });
+  }
   req.session.destroy((err) => {
     if (err) {
       return res.status(500).json({ error: 'Failed to logout' });

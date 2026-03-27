@@ -65,6 +65,7 @@ router.post('/', importLimiter, validate(importSchema), async (req, res) => {
 router.get('/', async (req, res) => {
   const decks = await prisma.deck.findMany({
     orderBy: { createdAt: 'desc' },
+    take: 100,
     include: {
       user: { select: { name: true } },
       _count: { select: { links: true } },
@@ -150,6 +151,7 @@ router.post('/:deckId/reexport', importLimiter, requireDeckOwner, async (req, re
       pageHeight: metadata.pageHeight,
     });
 
+    logAudit(req.session.userId, 'deck.reexport', deck.id, { title: metadata.title });
     res.json({ message: 'Re-export started', slideCount: metadata.slideCount });
   } catch (err) {
     console.error('Deck re-export error:', err);

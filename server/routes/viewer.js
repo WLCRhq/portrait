@@ -164,6 +164,10 @@ router.get('/:slug/slide/:index/overlays', async (req, res) => {
   const { link } = result;
   const slideIndex = parseInt(req.params.index);
 
+  if (isNaN(slideIndex) || slideIndex < 0) {
+    return res.status(400).json({ error: 'Invalid slide index' });
+  }
+
   const slide = await prisma.slide.findUnique({
     where: { deckId_index: { deckId: link.deck.id, index: slideIndex } },
     include: { overlays: { orderBy: { zIndex: 'asc' } } },

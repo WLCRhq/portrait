@@ -13,6 +13,7 @@ export async function getDeckAnalytics(deckId) {
 
   const sessions = await prisma.viewSession.findMany({
     where: { link: { deckId } },
+    take: 500,
     include: {
       events: {
         orderBy: { slideIndex: 'asc' },
