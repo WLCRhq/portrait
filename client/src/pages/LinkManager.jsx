@@ -1,9 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import axios from 'axios';
+import api from '../lib/api.js';
 import { Plus, Copy, Trash2, ToggleLeft, ToggleRight, Check, LayoutDashboard, BarChart3 } from 'lucide-react';
-
-const api = axios.create({ withCredentials: true });
 
 export default function LinkManager() {
   const { deckId } = useParams();

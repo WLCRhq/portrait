@@ -336,6 +336,7 @@ export default function Viewer() {
         padding: '8px 16px', fontSize: 13, color: subtleColor, flexShrink: 0,
       }}>
         <span>{meta.title}</span>
+        <span style={{ fontSize: 10, opacity: 0.5 }}>Anonymous analytics tracked</span>
         <span>{currentSlide + 1} / {meta.slideCount}</span>
       </div>
     </div>

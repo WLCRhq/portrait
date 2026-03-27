@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { OAuth2Client } from 'google-auth-library';
 import prisma from '../lib/prisma.js';
+import { encrypt } from '../lib/crypto.js';
+import { generateCsrf } from '../middleware/csrf.js';
 
 const router = Router();
 
@@ -22,7 +24,7 @@ router.get('/google', (_req, res) => {
       'https://www.googleapis.com/auth/userinfo.email',
       'https://www.googleapis.com/auth/userinfo.profile',
       'https://www.googleapis.com/auth/presentations.readonly',
-      'https://www.googleapis.com/auth/drive.readonly',
+      'https://www.googleapis.com/auth/drive.file',
     ],
   });
   res.redirect(authorizeUrl);
@@ -46,21 +48,21 @@ router.get('/google/callback', async (req, res) => {
     });
     const { id: googleId, email, name } = userInfoRes.data;
 
-    // Upsert user
+    // Upsert user (encrypt tokens at rest)
     const user = await prisma.user.upsert({
       where: { googleId },
       update: {
         email,
         name,
-        accessToken: tokens.access_token,
-        refreshToken: tokens.refresh_token || undefined,
+        accessToken: encrypt(tokens.access_token),
+        refreshToken: tokens.refresh_token ? encrypt(tokens.refresh_token) : undefined,
       },
       create: {
         googleId,
         email,
         name,
-        accessToken: tokens.access_token,
-        refreshToken: tokens.refresh_token || '',
+        accessToken: encrypt(tokens.access_token),
+        refreshToken: encrypt(tokens.refresh_token || ''),
       },
     });
 
@@ -90,11 +92,11 @@ router.get('/me', async (req, res) => {
     return res.status(401).json({ error: 'User not found' });
   }
 
-  res.json(user);
+  res.json({ ...user, csrfToken: generateCsrf(req) });
 });
 
 // Logout
-router.get('/logout', (req, res) => {
+router.post('/logout', (req, res) => {
   req.session.destroy((err) => {
     if (err) {
       return res.status(500).json({ error: 'Failed to logout' });

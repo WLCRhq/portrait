@@ -1,7 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import axios from 'axios';
-
-const api = axios.create({ withCredentials: true });
+import api from '../lib/api.js';
 
 export function useAnalytics(deckId) {
   const [data, setData] = useState(null);

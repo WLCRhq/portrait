@@ -96,3 +96,15 @@ model SlideEvent {
   exitedAt   DateTime?
   durationMs Int?
 }
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String
+  action    String
+  targetId  String
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+}

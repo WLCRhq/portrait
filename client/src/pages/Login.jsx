@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../lib/api.js';
 export default function Login() {
   const navigate = useNavigate();
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    axios.get('/auth/me', { withCredentials: true })
+    api.get('/auth/me')
       .then(() => navigate('/dashboard'))
       .catch(() => setChecking(false));
   }, [navigate]);

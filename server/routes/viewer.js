@@ -4,6 +4,7 @@ import geoip from 'geoip-lite';
 import prisma from '../lib/prisma.js';
 import { viewerLimiter } from '../middleware/rateLimiter.js';
 import { getSlideImagePath } from '../services/storage.js';
+import { anonymizeIp } from '../lib/privacy.js';
 import fs from 'fs';
 import path from 'path';
 
@@ -70,10 +71,10 @@ router.get('/:slug/meta', async (req, res) => {
   const session = await prisma.viewSession.create({
     data: {
       linkId: link.id,
-      viewerIp: ip,
+      viewerIp: anonymizeIp(ip),
       userAgent,
       country: geo?.country || null,
-      city: geo?.city || null,
+      city: null, // city-level geo removed for privacy
     },
   });
 
@@ -91,7 +92,10 @@ router.get('/:slug/meta', async (req, res) => {
 router.post('/:slug/event', async (req, res) => {
   const parsed = slideEventSchema.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({ error: 'Invalid request', details: parsed.error.flatten() });
+    return res.status(400).json({
+      error: 'Invalid request',
+      ...(process.env.NODE_ENV !== 'production' && { details: parsed.error.flatten() }),
+    });
   }
 
   const { sessionId, slideIndex, enteredAt, exitedAt } = parsed.data;

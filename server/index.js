@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import './lib/env.js'; // Validate required env vars — exits if missing
 import express from 'express';
 import session from 'express-session';
 import ConnectPgSimple from 'connect-pg-simple';
@@ -14,6 +15,8 @@ import linkRoutes from './routes/links.js';
 import analyticsRoutes from './routes/analytics.js';
 import viewerRoutes from './routes/viewer.js';
 import { requireAuth } from './middleware/auth.js';
+import { validateCsrf } from './middleware/csrf.js';
+import { runDataRetention } from './jobs/dataRetention.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -24,8 +27,13 @@ app.set('trust proxy', 1);
 
 // Middleware
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+const clientUrl = process.env.CLIENT_URL;
+if (process.env.NODE_ENV === 'production' && !clientUrl) {
+  console.error('FATAL: CLIENT_URL is required in production');
+  process.exit(1);
+}
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:5173',
+  origin: clientUrl || 'http://localhost:5173',
   credentials: true,
 }));
 app.use(morgan('dev'));
@@ -38,30 +46,33 @@ app.use(session({
     conString: process.env.DATABASE_URL,
     createTableIfMissing: true,
   }),
-  secret: process.env.SESSION_SECRET || 'dev-secret',
+  secret: process.env.SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
+  rolling: true,
   cookie: {
     secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
     sameSite: 'lax',
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    maxAge: 2 * 24 * 60 * 60 * 1000, // 2 days
   },
 }));
 
 // Serve uploaded slide images
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
+import { authLimiter } from './middleware/rateLimiter.js';
+
 // Routes — public (no auth)
-app.use('/auth', authRoutes);
+app.use('/auth', authLimiter, authRoutes);
 app.use('/api/view', viewerRoutes);
 
-// Routes — protected (require auth)
-app.use('/api/decks', requireAuth, deckRoutes);
+// Routes — protected (require auth + CSRF on state-changing requests)
+app.use('/api/decks', requireAuth, validateCsrf, deckRoutes);
 app.use('/api/analytics', requireAuth, analyticsRoutes);
 
 // Link routes are nested under decks but defined separately for clarity
-app.use('/api/decks', requireAuth, linkRoutes);
+app.use('/api/decks', requireAuth, validateCsrf, linkRoutes);
 
 // Health check
 app.get('/api/health', (_req, res) => {
@@ -80,6 +91,10 @@ if (process.env.NODE_ENV === 'production') {
 
 app.listen(PORT, () => {
   console.log(`Portrait server running on http://localhost:${PORT}`);
+
+  // Run data retention daily (clean up PII older than 90 days)
+  runDataRetention();
+  setInterval(runDataRetention, 24 * 60 * 60 * 1000);
 });
 
 export default app;

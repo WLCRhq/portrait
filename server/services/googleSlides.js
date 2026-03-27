@@ -1,6 +1,7 @@
 import { google } from 'googleapis';
 import { OAuth2Client } from 'google-auth-library';
 import prisma from '../lib/prisma.js';
+import { decrypt, encrypt } from '../lib/crypto.js';
 
 function createAuthClient(accessToken, refreshToken) {
   const client = new OAuth2Client(
@@ -22,14 +23,18 @@ export async function getAuthClient(userId) {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) throw new Error('User not found');
 
-  const client = createAuthClient(user.accessToken, user.refreshToken);
+  // Decrypt tokens from DB
+  const accessToken = decrypt(user.accessToken);
+  const refreshToken = decrypt(user.refreshToken);
+  const client = createAuthClient(accessToken, refreshToken);
 
   try {
     const { credentials } = await client.refreshAccessToken();
-    if (credentials.access_token !== user.accessToken) {
+    if (credentials.access_token !== accessToken) {
+      // Re-encrypt the new access token before saving
       await prisma.user.update({
         where: { id: userId },
-        data: { accessToken: credentials.access_token },
+        data: { accessToken: encrypt(credentials.access_token) },
       });
     }
     client.setCredentials(credentials);

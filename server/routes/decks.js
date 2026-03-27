@@ -1,8 +1,13 @@
 import { Router } from 'express';
+import { z } from 'zod';
 import prisma from '../lib/prisma.js';
 import { getAuthClient, getPresentationMetadata } from '../services/googleSlides.js';
 import { deleteDeckImages, getSlideImagePath } from '../services/storage.js';
 import { exportQueue } from '../jobs/exportWorker.js';
+import { requireDeckOwner } from '../middleware/requireOwner.js';
+import { validate } from '../lib/validate.js';
+import { logAudit } from '../lib/audit.js';
+import { importLimiter } from '../middleware/rateLimiter.js';
 import fs from 'fs';
 import path from 'path';
 
@@ -14,8 +19,10 @@ function extractPresentationId(input) {
   return match ? match[1] : input.trim();
 }
 
+const importSchema = z.object({ presentationId: z.string().min(1).max(500) });
+
 // POST /api/decks — Import a new deck (attributed to the importing user)
-router.post('/', async (req, res) => {
+router.post('/', importLimiter, validate(importSchema), async (req, res) => {
   try {
     const { presentationId: rawId } = req.body;
     if (!rawId) {
@@ -46,6 +53,7 @@ router.post('/', async (req, res) => {
       pageHeight: metadata.pageHeight,
     });
 
+    logAudit(req.session.userId, 'deck.import', deck.id, { title: deck.title });
     res.status(201).json(deck);
   } catch (err) {
     console.error('Deck import error:', err);
@@ -83,8 +91,8 @@ router.get('/:deckId', async (req, res) => {
   res.json(deck);
 });
 
-// DELETE /api/decks/:deckId — Delete deck and associated data
-router.delete('/:deckId', async (req, res) => {
+// DELETE /api/decks/:deckId — Delete deck (owner only)
+router.delete('/:deckId', requireDeckOwner, async (req, res) => {
   const deck = await prisma.deck.findUnique({
     where: { id: req.params.deckId },
   });
@@ -96,11 +104,12 @@ router.delete('/:deckId', async (req, res) => {
   await deleteDeckImages(deck.id);
   await prisma.deck.delete({ where: { id: deck.id } });
 
+  logAudit(req.session.userId, 'deck.delete', deck.id, { title: deck.title });
   res.json({ message: 'Deck deleted' });
 });
 
-// POST /api/decks/:deckId/reexport — Re-export slides from Google (keeps links intact)
-router.post('/:deckId/reexport', async (req, res) => {
+// POST /api/decks/:deckId/reexport — Re-export slides (owner only)
+router.post('/:deckId/reexport', importLimiter, requireDeckOwner, async (req, res) => {
   try {
     const deck = await prisma.deck.findUnique({
       where: { id: req.params.deckId },

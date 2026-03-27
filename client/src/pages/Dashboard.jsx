@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api, { setCsrfToken } from '../lib/api.js';
 import { useDecks } from '../hooks/useDecks.js';
 import { Plus, Trash2, RefreshCw, BarChart3, Link2, LogOut, Loader } from 'lucide-react';
 
@@ -14,8 +14,11 @@ export default function Dashboard() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    axios.get('/auth/me', { withCredentials: true })
-      .then((res) => setUser(res.data))
+    api.get('/auth/me')
+      .then((res) => {
+        setUser(res.data);
+        if (res.data.csrfToken) setCsrfToken(res.data.csrfToken);
+      })
       .catch(() => navigate('/'));
   }, [navigate]);
 
@@ -46,7 +49,7 @@ export default function Dashboard() {
   const handleReexport = async (deckId) => {
     setRefreshingId(deckId);
     try {
-      await axios.post(`/api/decks/${deckId}/reexport`, {}, { withCredentials: true });
+      await api.post(`/api/decks/${deckId}/reexport`);
       await fetchDecks();
     } catch {
       // handle silently
@@ -55,7 +58,7 @@ export default function Dashboard() {
   };
 
   const handleLogout = async () => {
-    await axios.get('/auth/logout', { withCredentials: true });
+    await api.post('/auth/logout');
     navigate('/');
   };
 
