@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { OAuth2Client } from 'google-auth-library';
 import prisma from '../lib/prisma.js';
+import { randomBytes } from 'crypto';
 import { encrypt } from '../lib/crypto.js';
 import { generateCsrf } from '../middleware/csrf.js';
 
@@ -15,11 +16,15 @@ function getOAuth2Client() {
 }
 
 // Redirect to Google consent screen
-router.get('/google', (_req, res) => {
+router.get('/google', (req, res) => {
+  const state = randomBytes(16).toString('hex');
+  req.session.oauthState = state;
+
   const client = getOAuth2Client();
   const authorizeUrl = client.generateAuthUrl({
     access_type: 'offline',
     prompt: 'consent',
+    state,
     scope: [
       'https://www.googleapis.com/auth/userinfo.email',
       'https://www.googleapis.com/auth/userinfo.profile',
@@ -32,10 +37,16 @@ router.get('/google', (_req, res) => {
 
 // OAuth callback
 router.get('/google/callback', async (req, res) => {
-  const { code } = req.query;
+  const { code, state } = req.query;
   if (!code) {
     return res.status(400).json({ error: 'Missing authorization code' });
   }
+
+  // Verify OAuth state to prevent CSRF
+  if (!state || state !== req.session.oauthState) {
+    return res.status(403).json({ error: 'Invalid OAuth state' });
+  }
+  delete req.session.oauthState;
 
   try {
     const client = getOAuth2Client();

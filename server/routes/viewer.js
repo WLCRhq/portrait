@@ -100,6 +100,14 @@ router.post('/:slug/event', async (req, res) => {
 
   const { sessionId, slideIndex, enteredAt, exitedAt } = parsed.data;
 
+  // Verify session belongs to this link
+  const session = await prisma.viewSession.findFirst({
+    where: { id: sessionId, link: { slug: req.params.slug } },
+  });
+  if (!session) {
+    return res.status(403).json({ error: 'Invalid session' });
+  }
+
   const entered = new Date(enteredAt);
   const exited = exitedAt ? new Date(exitedAt) : null;
   const durationMs = exited ? exited.getTime() - entered.getTime() : null;
@@ -126,12 +134,13 @@ router.post('/:slug/end', async (req, res) => {
 
   const { sessionId } = parsed.data;
 
-  const session = await prisma.viewSession.findUnique({
-    where: { id: sessionId },
+  // Verify session belongs to this link
+  const session = await prisma.viewSession.findFirst({
+    where: { id: sessionId, link: { slug: req.params.slug } },
   });
 
   if (!session) {
-    return res.status(404).json({ error: 'Session not found' });
+    return res.status(403).json({ error: 'Invalid session' });
   }
 
   const endedAt = new Date();
@@ -171,7 +180,13 @@ router.get('/:slug/slide/:index', async (req, res) => {
   }
 
   const { link } = result;
-  const imagePath = getSlideImagePath(link.deck.id, parseInt(req.params.index));
+  const slideIndex = parseInt(req.params.index);
+
+  if (isNaN(slideIndex) || slideIndex < 0) {
+    return res.status(400).json({ error: 'Invalid slide index' });
+  }
+
+  const imagePath = getSlideImagePath(link.deck.id, slideIndex);
 
   if (!fs.existsSync(imagePath)) {
     return res.status(404).json({ error: 'Slide image not found' });

@@ -167,7 +167,12 @@ router.get('/:deckId/slides/:index/image', async (req, res) => {
     return res.status(404).json({ error: 'Deck not found' });
   }
 
-  const imagePath = getSlideImagePath(deck.id, parseInt(req.params.index));
+  const slideIndex = parseInt(req.params.index);
+  if (isNaN(slideIndex) || slideIndex < 0) {
+    return res.status(400).json({ error: 'Invalid slide index' });
+  }
+
+  const imagePath = getSlideImagePath(deck.id, slideIndex);
 
   if (!fs.existsSync(imagePath)) {
     return res.status(404).json({ error: 'Slide image not found' });

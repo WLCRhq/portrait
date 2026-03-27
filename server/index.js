@@ -61,18 +61,18 @@ app.use(session({
 // Serve uploaded slide images
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
-import { authLimiter } from './middleware/rateLimiter.js';
+import { authLimiter, apiLimiter } from './middleware/rateLimiter.js';
 
 // Routes — public (no auth)
 app.use('/auth', authLimiter, authRoutes);
 app.use('/api/view', viewerRoutes);
 
-// Routes — protected (require auth + CSRF on state-changing requests)
-app.use('/api/decks', requireAuth, validateCsrf, deckRoutes);
-app.use('/api/analytics', requireAuth, analyticsRoutes);
+// Routes — protected (require auth + CSRF + rate limiting)
+app.use('/api/decks', requireAuth, apiLimiter, validateCsrf, deckRoutes);
+app.use('/api/analytics', requireAuth, apiLimiter, analyticsRoutes);
 
 // Link routes are nested under decks but defined separately for clarity
-app.use('/api/decks', requireAuth, validateCsrf, linkRoutes);
+app.use('/api/decks', requireAuth, apiLimiter, validateCsrf, linkRoutes);
 
 // Health check
 app.get('/api/health', (_req, res) => {

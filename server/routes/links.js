@@ -1,14 +1,27 @@
 import { Router } from 'express';
+import { z } from 'zod';
 import { nanoid } from 'nanoid';
 import prisma from '../lib/prisma.js';
 import { requireDeckOwner } from '../middleware/requireOwner.js';
+import { validate } from '../lib/validate.js';
 import { logAudit } from '../lib/audit.js';
 
 const router = Router();
 
+const createLinkSchema = z.object({
+  label: z.string().max(255).optional(),
+  expiresAt: z.string().datetime({ offset: true }).or(z.string().datetime()).optional(),
+});
+
+const updateLinkSchema = z.object({
+  active: z.boolean().optional(),
+  label: z.string().max(255).nullable().optional(),
+  expiresAt: z.string().datetime({ offset: true }).or(z.string().datetime()).nullable().optional(),
+});
+
 // POST /api/decks/:deckId/links — Create a new share link
-router.post('/:deckId/links', async (req, res) => {
-  const deck = await prisma.deck.findFirst({
+router.post('/:deckId/links', validate(createLinkSchema), async (req, res) => {
+  const deck = await prisma.deck.findUnique({
     where: { id: req.params.deckId },
   });
 
@@ -37,7 +50,7 @@ router.post('/:deckId/links', async (req, res) => {
 
 // GET /api/decks/:deckId/links — List all links for a deck
 router.get('/:deckId/links', async (req, res) => {
-  const deck = await prisma.deck.findFirst({
+  const deck = await prisma.deck.findUnique({
     where: { id: req.params.deckId },
   });
 
@@ -56,9 +69,9 @@ router.get('/:deckId/links', async (req, res) => {
   res.json(links);
 });
 
-// PATCH /api/decks/:deckId/links/:linkId — Update a link
-router.patch('/:deckId/links/:linkId', requireDeckOwner, async (req, res) => {
-  const deck = await prisma.deck.findFirst({
+// PATCH /api/decks/:deckId/links/:linkId — Update a link (owner only)
+router.patch('/:deckId/links/:linkId', requireDeckOwner, validate(updateLinkSchema), async (req, res) => {
+  const deck = await prisma.deck.findUnique({
     where: { id: req.params.deckId },
   });
 
@@ -77,12 +90,13 @@ router.patch('/:deckId/links/:linkId', requireDeckOwner, async (req, res) => {
     },
   });
 
+  logAudit(req.session.userId, 'link.update', req.params.linkId, req.body);
   res.json(link);
 });
 
-// DELETE /api/decks/:deckId/links/:linkId — Delete a link
+// DELETE /api/decks/:deckId/links/:linkId — Delete a link (owner only)
 router.delete('/:deckId/links/:linkId', requireDeckOwner, async (req, res) => {
-  const deck = await prisma.deck.findFirst({
+  const deck = await prisma.deck.findUnique({
     where: { id: req.params.deckId },
   });
 
@@ -94,6 +108,7 @@ router.delete('/:deckId/links/:linkId', requireDeckOwner, async (req, res) => {
     where: { id: req.params.linkId, deckId: deck.id },
   });
 
+  logAudit(req.session.userId, 'link.delete', req.params.linkId, { deckId: deck.id });
   res.json({ message: 'Link deleted' });
 });
 
