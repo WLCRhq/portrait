@@ -80,6 +80,7 @@ model ViewSession {
   viewerIp     String
   userAgent    String
   country      String?
+  region       String?
   city         String?
   startedAt    DateTime     @default(now())
   endedAt      DateTime?

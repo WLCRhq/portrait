@@ -91,6 +91,7 @@ export async function getDeckAnalytics(deckId) {
       viewerIp: s.viewerIp,
       userAgent: s.userAgent,
       country: s.country,
+      region: s.region,
       city: s.city,
       startedAt: s.startedAt,
       endedAt: s.endedAt,

@@ -74,7 +74,8 @@ router.get('/:slug/meta', async (req, res) => {
       viewerIp: anonymizeIp(ip),
       userAgent,
       country: geo?.country || null,
-      city: null, // city-level geo removed for privacy
+      region: geo?.region || null,
+      city: geo?.city || null,
     },
   });
 
