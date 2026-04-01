@@ -8,14 +8,15 @@ datasource db {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  googleId     String   @unique
-  email        String   @unique
+  id           String     @id @default(cuid())
+  googleId     String     @unique
+  email        String     @unique
   name         String
   accessToken  String
   refreshToken String
-  createdAt    DateTime @default(now())
+  createdAt    DateTime   @default(now())
   decks        Deck[]
+  proposals    Proposal[]
 }
 
 model Deck {
@@ -31,6 +32,7 @@ model Deck {
   createdAt    DateTime  @default(now())
   slides       Slide[]
   links        ShareLink[]
+  proposals    Proposal[]
 }
 
 model Slide {
@@ -62,15 +64,17 @@ model SlideOverlay {
 }
 
 model ShareLink {
-  id        String       @id @default(cuid())
-  deckId    String
-  deck      Deck         @relation(fields: [deckId], references: [id], onDelete: Cascade)
-  slug      String       @unique
-  label     String?
-  active    Boolean      @default(true)
-  createdAt DateTime     @default(now())
-  expiresAt DateTime?
-  sessions  ViewSession[]
+  id         String       @id @default(cuid())
+  deckId     String?
+  deck       Deck?        @relation(fields: [deckId], references: [id], onDelete: Cascade)
+  proposalId String?
+  proposal   Proposal?    @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  slug       String       @unique
+  label      String?
+  active     Boolean      @default(true)
+  createdAt  DateTime     @default(now())
+  expiresAt  DateTime?
+  sessions   ViewSession[]
 }
 
 model ViewSession {
@@ -96,6 +100,37 @@ model SlideEvent {
   enteredAt  DateTime
   exitedAt   DateTime?
   durationMs Int?
+}
+
+model Proposal {
+  id        String          @id @default(cuid())
+  userId    String
+  user      User            @relation(fields: [userId], references: [id])
+  title     String
+  client    String?
+  deckId    String?
+  deck      Deck?           @relation(fields: [deckId], references: [id])
+  sowMeta   Json?
+  sowData   Json?
+  status    String          @default("draft")
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  slides    ProposalSlide[]
+  links     ShareLink[]
+}
+
+model ProposalSlide {
+  id              String   @id @default(cuid())
+  proposalId      String
+  proposal        Proposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  index           Int
+  type            String
+  sourceSlideIndex Int?
+  sowCategoryId   String?
+  content         Json?
+  createdAt       DateTime @default(now())
+
+  @@unique([proposalId, index])
 }
 
 model AuditLog {

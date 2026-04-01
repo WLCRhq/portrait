@@ -32,6 +32,14 @@ async function resolveLink(slug) {
       deck: {
         select: { id: true, title: true, slideCount: true, exportStatus: true, bgColor: true, exportedAt: true },
       },
+      proposal: {
+        include: {
+          slides: { orderBy: { index: 'asc' } },
+          deck: {
+            select: { id: true, title: true, slideCount: true, exportStatus: true, bgColor: true, exportedAt: true },
+          },
+        },
+      },
     },
   });
 
@@ -40,11 +48,22 @@ async function resolveLink(slug) {
   if (link.expiresAt && new Date() > link.expiresAt) {
     return { error: 'This link has expired', status: 410 };
   }
+
+  // Determine if this is a deck link or proposal link
+  if (link.proposalId && link.proposal) {
+    // Proposal link — check that the linked deck (if any) is exported
+    if (link.proposal.deck && link.proposal.deck.exportStatus !== 'done') {
+      return { error: 'Presentation is still being processed', status: 202 };
+    }
+    return { link, type: 'proposal' };
+  }
+
+  // Deck link (original behavior)
+  if (!link.deck) return { error: 'Link not found', status: 404 };
   if (link.deck.exportStatus !== 'done') {
     return { error: 'Presentation is still being processed', status: 202 };
   }
-
-  return { link };
+  return { link, type: 'deck' };
 }
 
 // GET /api/view/:slug/meta — Get presentation metadata and create session
@@ -54,7 +73,7 @@ router.get('/:slug/meta', async (req, res) => {
     return res.status(result.status).json({ error: result.error });
   }
 
-  const { link } = result;
+  const { link, type } = result;
 
   // Capture viewer IP
   const ip =
@@ -79,14 +98,40 @@ router.get('/:slug/meta', async (req, res) => {
     },
   });
 
-  res.json({
-    sessionId: session.id,
-    deckId: link.deck.id,
-    title: link.deck.title,
-    slideCount: link.deck.slideCount,
-    bgColor: link.deck.bgColor,
-    exportedAt: link.deck.exportedAt,
-  });
+  if (type === 'proposal') {
+    const proposal = link.proposal;
+    const deck = proposal.deck;
+
+    res.json({
+      sessionId: session.id,
+      type: 'proposal',
+      proposalId: proposal.id,
+      title: proposal.title,
+      client: proposal.client,
+      slideCount: proposal.slides.length,
+      bgColor: deck?.bgColor || '#1e293b',
+      exportedAt: deck?.exportedAt || null,
+      deckId: deck?.id || null,
+      slides: proposal.slides.map(s => ({
+        index: s.index,
+        type: s.type,
+        sowCategoryId: s.sowCategoryId,
+        content: s.content,
+        sourceSlideIndex: s.sourceSlideIndex,
+      })),
+    });
+  } else {
+    // Original deck response (backward compatible)
+    res.json({
+      sessionId: session.id,
+      type: 'deck',
+      deckId: link.deck.id,
+      title: link.deck.title,
+      slideCount: link.deck.slideCount,
+      bgColor: link.deck.bgColor,
+      exportedAt: link.deck.exportedAt,
+    });
+  }
 });
 
 // POST /api/view/:slug/event — Record a slide viewing event
@@ -162,15 +207,29 @@ router.get('/:slug/slide/:index/overlays', async (req, res) => {
     return res.status(result.status).json({ error: result.error });
   }
 
-  const { link } = result;
+  const { link, type } = result;
   const slideIndex = parseInt(req.params.index);
 
   if (isNaN(slideIndex) || slideIndex < 0) {
     return res.status(400).json({ error: 'Invalid slide index' });
   }
 
+  // For proposals, resolve the source deck slide for overlays
+  let deckId, deckSlideIndex;
+  if (type === 'proposal') {
+    const proposalSlide = link.proposal.slides.find(s => s.index === slideIndex);
+    if (!proposalSlide || proposalSlide.type !== 'deck_slide' || !link.proposal.deck) {
+      return res.json([]);
+    }
+    deckId = link.proposal.deck.id;
+    deckSlideIndex = proposalSlide.sourceSlideIndex;
+  } else {
+    deckId = link.deck.id;
+    deckSlideIndex = slideIndex;
+  }
+
   const slide = await prisma.slide.findUnique({
-    where: { deckId_index: { deckId: link.deck.id, index: slideIndex } },
+    where: { deckId_index: { deckId, index: deckSlideIndex } },
     include: { overlays: { orderBy: { zIndex: 'asc' } } },
   });
 
@@ -184,14 +243,28 @@ router.get('/:slug/slide/:index', async (req, res) => {
     return res.status(result.status).json({ error: result.error });
   }
 
-  const { link } = result;
+  const { link, type } = result;
   const slideIndex = parseInt(req.params.index);
 
   if (isNaN(slideIndex) || slideIndex < 0) {
     return res.status(400).json({ error: 'Invalid slide index' });
   }
 
-  const imagePath = getSlideImagePath(link.deck.id, slideIndex);
+  // For proposals, resolve the source deck slide image
+  let deckId, deckSlideIndex;
+  if (type === 'proposal') {
+    const proposalSlide = link.proposal.slides.find(s => s.index === slideIndex);
+    if (!proposalSlide || proposalSlide.type !== 'deck_slide' || !link.proposal.deck) {
+      return res.status(404).json({ error: 'No image for this slide type' });
+    }
+    deckId = link.proposal.deck.id;
+    deckSlideIndex = proposalSlide.sourceSlideIndex;
+  } else {
+    deckId = link.deck.id;
+    deckSlideIndex = slideIndex;
+  }
+
+  const imagePath = getSlideImagePath(deckId, deckSlideIndex);
 
   if (!fs.existsSync(imagePath)) {
     return res.status(404).json({ error: 'Slide image not found' });

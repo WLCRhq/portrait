@@ -12,6 +12,7 @@ import { fileURLToPath } from 'url';
 import authRoutes from './routes/auth.js';
 import deckRoutes from './routes/decks.js';
 import linkRoutes from './routes/links.js';
+import proposalRoutes from './routes/proposals.js';
 import analyticsRoutes from './routes/analytics.js';
 import viewerRoutes from './routes/viewer.js';
 import { requireAuth } from './middleware/auth.js';
@@ -73,6 +74,9 @@ app.use('/api/analytics', requireAuth, apiLimiter, analyticsRoutes);
 
 // Link routes are nested under decks but defined separately for clarity
 app.use('/api/decks', requireAuth, apiLimiter, validateCsrf, linkRoutes);
+
+// Proposal routes (CRUD + links + slide ordering)
+app.use('/api/proposals', requireAuth, apiLimiter, validateCsrf, proposalRoutes);
 
 // Health check
 app.get('/api/health', (_req, res) => {

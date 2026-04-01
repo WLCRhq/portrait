@@ -1,28 +1,9 @@
 import prisma from '../lib/prisma.js';
 
 /**
- * Get full analytics for a deck: summary + all sessions with events.
+ * Compute analytics summary from sessions and a given slide count.
  */
-export async function getDeckAnalytics(deckId) {
-  const deck = await prisma.deck.findUnique({
-    where: { id: deckId },
-    select: { title: true, slideCount: true, exportedAt: true },
-  });
-
-  if (!deck) return null;
-
-  const sessions = await prisma.viewSession.findMany({
-    where: { link: { deckId } },
-    take: 500,
-    include: {
-      events: {
-        orderBy: { slideIndex: 'asc' },
-      },
-    },
-    orderBy: { startedAt: 'desc' },
-  });
-
-  // Compute summary
+function computeSummary(sessions, slideCount) {
   const totalViews = sessions.length;
   const uniqueIps = new Set(sessions.map((s) => s.viewerIp));
   const uniqueViewers = uniqueIps.size;
@@ -32,7 +13,6 @@ export async function getDeckAnalytics(deckId) {
     ? Math.round(completedSessions.reduce((sum, s) => sum + s.totalSeconds, 0) / completedSessions.length)
     : 0;
 
-  // Average time per slide across all sessions
   const slideTimeTotals = {};
   const slideCounts = {};
 
@@ -46,13 +26,12 @@ export async function getDeckAnalytics(deckId) {
   }
 
   const avgTimePerSlide = [];
-  for (let i = 0; i < deck.slideCount; i++) {
+  for (let i = 0; i < slideCount; i++) {
     const total = slideTimeTotals[i] || 0;
     const count = slideCounts[i] || 0;
     avgTimePerSlide.push(count > 0 ? Math.round(total / count / 1000) : 0);
   }
 
-  // Find most-viewed slide
   const slideViewCounts = {};
   for (const session of sessions) {
     const viewedSlides = new Set(session.events.map((e) => e.slideIndex));
@@ -70,36 +49,90 @@ export async function getDeckAnalytics(deckId) {
     }
   }
 
-  // Drop-off funnel: how many viewers reached each slide
   const dropOffFunnel = [];
-  for (let i = 0; i < deck.slideCount; i++) {
+  for (let i = 0; i < slideCount; i++) {
     dropOffFunnel.push(slideViewCounts[i] || 0);
   }
 
+  return { totalViews, uniqueViewers, avgTotalTimeSec, avgTimePerSlide, mostViewedSlide, dropOffFunnel };
+}
+
+function formatSessions(sessions) {
+  return sessions.map((s) => ({
+    id: s.id,
+    viewerIp: s.viewerIp,
+    userAgent: s.userAgent,
+    country: s.country,
+    region: s.region,
+    city: s.city,
+    startedAt: s.startedAt,
+    endedAt: s.endedAt,
+    totalSeconds: s.totalSeconds,
+    slideEvents: s.events.map((e) => ({
+      slideIndex: e.slideIndex,
+      durationMs: e.durationMs,
+    })),
+  }));
+}
+
+/**
+ * Get full analytics for a deck: summary + all sessions with events.
+ */
+export async function getDeckAnalytics(deckId) {
+  const deck = await prisma.deck.findUnique({
+    where: { id: deckId },
+    select: { title: true, slideCount: true, exportedAt: true },
+  });
+
+  if (!deck) return null;
+
+  const sessions = await prisma.viewSession.findMany({
+    where: { link: { deckId } },
+    take: 500,
+    include: { events: { orderBy: { slideIndex: 'asc' } } },
+    orderBy: { startedAt: 'desc' },
+  });
+
   return {
     deck,
-    summary: {
-      totalViews,
-      uniqueViewers,
-      avgTotalTimeSec,
-      avgTimePerSlide,
-      mostViewedSlide,
-      dropOffFunnel,
+    summary: computeSummary(sessions, deck.slideCount),
+    sessions: formatSessions(sessions),
+  };
+}
+
+/**
+ * Get full analytics for a proposal: summary + all sessions with events.
+ */
+export async function getProposalAnalytics(proposalId) {
+  const proposal = await prisma.proposal.findUnique({
+    where: { id: proposalId },
+    include: {
+      slides: {
+        select: { index: true, type: true, sowCategoryId: true },
+        orderBy: { index: 'asc' },
+      },
     },
-    sessions: sessions.map((s) => ({
-      id: s.id,
-      viewerIp: s.viewerIp,
-      userAgent: s.userAgent,
-      country: s.country,
-      region: s.region,
-      city: s.city,
-      startedAt: s.startedAt,
-      endedAt: s.endedAt,
-      totalSeconds: s.totalSeconds,
-      slideEvents: s.events.map((e) => ({
-        slideIndex: e.slideIndex,
-        durationMs: e.durationMs,
-      })),
+  });
+
+  if (!proposal) return null;
+
+  const slideCount = proposal.slides?.length || 0;
+
+  const sessions = await prisma.viewSession.findMany({
+    where: { link: { proposalId } },
+    take: 500,
+    include: { events: { orderBy: { slideIndex: 'asc' } } },
+    orderBy: { startedAt: 'desc' },
+  });
+
+  return {
+    proposal: { title: proposal.title, client: proposal.client, slideCount },
+    slideLabels: (proposal.slides || []).map(s => ({
+      index: s.index,
+      type: s.type,
+      sowCategoryId: s.sowCategoryId,
     })),
+    summary: computeSummary(sessions, slideCount),
+    sessions: formatSessions(sessions),
   };
 }

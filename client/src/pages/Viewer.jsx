@@ -3,6 +3,8 @@ import { useParams } from 'react-router-dom';
 import axios from 'axios';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
+import SOWSlide from '../components/SOWSlide.jsx';
+import SOWTotalsSlide from '../components/SOWTotalsSlide.jsx';
 
 function isLightColor(hex) {
   if (!hex) return false;
@@ -59,7 +61,19 @@ export default function Viewer() {
     };
   }, [meta]);
 
-  // Preload upcoming slides (current +1, +2, +3)
+  // Helper: get the slide type for a given index
+  const getSlideType = useCallback((index) => {
+    if (!meta) return 'deck_slide';
+    if (meta.type === 'proposal' && meta.slides) {
+      return meta.slides[index]?.type || 'deck_slide';
+    }
+    return 'deck_slide';
+  }, [meta]);
+
+  const currentSlideType = getSlideType(currentSlide);
+  const isDeckSlide = currentSlideType === 'deck_slide';
+
+  // Preload upcoming slides (only image slides)
   useEffect(() => {
     if (!meta) return;
     const cacheBust = meta.exportedAt ? `?v=${new Date(meta.exportedAt).getTime()}` : '';
@@ -68,6 +82,7 @@ export default function Viewer() {
       const idx = currentSlide + offset;
       if (idx >= meta.slideCount) break;
       if (preloadedRef.current.has(idx)) continue;
+      if (getSlideType(idx) !== 'deck_slide') continue;
 
       const img = new Image();
       img.src = `/api/view/${slug}/slide/${idx}${cacheBust}`;
@@ -75,20 +90,24 @@ export default function Viewer() {
     }
 
     // Also preload one slide back
-    if (currentSlide > 0 && !preloadedRef.current.has(currentSlide - 1)) {
+    if (currentSlide > 0 && !preloadedRef.current.has(currentSlide - 1) && getSlideType(currentSlide - 1) === 'deck_slide') {
       const img = new Image();
       img.src = `/api/view/${slug}/slide/${currentSlide - 1}${cacheBust}`;
       preloadedRef.current.add(currentSlide - 1);
     }
-  }, [currentSlide, meta, slug]);
+  }, [currentSlide, meta, slug, getSlideType]);
 
-  // Fetch overlays when slide changes
+  // Fetch overlays when slide changes (only for deck slides)
   useEffect(() => {
     if (!meta) return;
+    if (!isDeckSlide) {
+      setOverlays([]);
+      return;
+    }
     axios.get(`/api/view/${slug}/slide/${currentSlide}/overlays`)
       .then((res) => setOverlays(res.data))
       .catch(() => setOverlays([]));
-  }, [slug, currentSlide, meta]);
+  }, [slug, currentSlide, meta, isDeckSlide]);
 
   // Send slide event for the previous slide
   const sendSlideEvent = useCallback((slideIndex, entered) => {
@@ -146,9 +165,15 @@ export default function Viewer() {
     sendSlideEvent(currentSlide, enteredAtRef.current);
 
     setCurrentSlide(newIndex);
-    setImageLoading(true);
     setOverlays([]);
     enteredAtRef.current = Date.now();
+
+    // Only show image loading for deck slides
+    if (getSlideType(newIndex) === 'deck_slide') {
+      setImageLoading(true);
+    } else {
+      setImageLoading(false);
+    }
   };
 
   // Keyboard navigation
@@ -196,6 +221,9 @@ export default function Viewer() {
   const subtleColor = light ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.5)';
   const barTrack = light ? 'rgba(0,0,0,0.1)' : '#333';
 
+  // Get current slide data for proposal slides
+  const currentSlideData = meta.type === 'proposal' && meta.slides ? meta.slides[currentSlide] : null;
+
   return (
     <div style={{
       display: 'flex', flexDirection: 'column', height: '100vh',
@@ -214,8 +242,8 @@ export default function Viewer() {
         flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
         position: 'relative', overflow: 'hidden',
       }}>
-        {/* Loading spinner while slide image loads */}
-        {imageLoading && (
+        {/* Loading spinner while slide image loads (deck slides only) */}
+        {isDeckSlide && imageLoading && (
           <div style={{
             position: 'absolute', inset: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -225,81 +253,102 @@ export default function Viewer() {
           </div>
         )}
 
-        {/* Slide container: thumbnail + GIF overlays */}
-        <div
-          ref={slideContainerRef}
-          style={{ position: 'relative', maxWidth: '100%', maxHeight: '100%' }}
-        >
-          <img
-            src={`/api/view/${slug}/slide/${currentSlide}${cacheBust}`}
-            alt={`Slide ${currentSlide + 1}`}
-            style={{
-              maxWidth: '100vw', maxHeight: 'calc(100vh - 40px)', objectFit: 'contain',
-              display: 'block',
-              opacity: imageLoading ? 0 : 1, transition: 'opacity 0.3s ease',
-            }}
-            onLoad={() => setImageLoading(false)}
-            draggable={false}
-          />
+        {isDeckSlide ? (
+          /* Deck slide: image + overlays */
+          <div
+            ref={slideContainerRef}
+            style={{ position: 'relative', maxWidth: '100%', maxHeight: '100%' }}
+          >
+            <img
+              src={`/api/view/${slug}/slide/${currentSlide}${cacheBust}`}
+              alt={`Slide ${currentSlide + 1}`}
+              style={{
+                maxWidth: '100vw', maxHeight: 'calc(100vh - 40px)', objectFit: 'contain',
+                display: 'block',
+                opacity: imageLoading ? 0 : 1, transition: 'opacity 0.3s ease',
+              }}
+              onLoad={() => setImageLoading(false)}
+              draggable={false}
+            />
 
-          {/* GIF overlays positioned on top of the slide, with crop applied */}
-          {!imageLoading && overlays.map((overlay) => {
-            const hasCrop = overlay.cropTop || overlay.cropBottom || overlay.cropLeft || overlay.cropRight;
+            {/* GIF overlays positioned on top of the slide, with crop applied */}
+            {!imageLoading && overlays.map((overlay) => {
+              const hasCrop = overlay.cropTop || overlay.cropBottom || overlay.cropLeft || overlay.cropRight;
 
-            if (!hasCrop) {
+              if (!hasCrop) {
+                return (
+                  <img
+                    key={overlay.id}
+                    src={`${overlay.imageUrl}${cacheBust}`}
+                    alt=""
+                    style={{
+                      position: 'absolute',
+                      left: `${overlay.x}%`,
+                      top: `${overlay.y}%`,
+                      width: `${overlay.width}%`,
+                      height: `${overlay.height}%`,
+                      objectFit: 'fill',
+                      pointerEvents: 'none',
+                    }}
+                  />
+                );
+              }
+
+              const visibleW = 1 - overlay.cropLeft - overlay.cropRight;
+              const visibleH = 1 - overlay.cropTop - overlay.cropBottom;
+              const imgWidthPct = (1 / visibleW) * 100;
+              const imgHeightPct = (1 / visibleH) * 100;
+              const imgLeftPct = -(overlay.cropLeft / visibleW) * 100;
+              const imgTopPct = -(overlay.cropTop / visibleH) * 100;
+
               return (
-                <img
+                <div
                   key={overlay.id}
-                  src={`${overlay.imageUrl}${cacheBust}`}
-                  alt=""
                   style={{
                     position: 'absolute',
                     left: `${overlay.x}%`,
                     top: `${overlay.y}%`,
                     width: `${overlay.width}%`,
                     height: `${overlay.height}%`,
-                    objectFit: 'fill',
+                    overflow: 'hidden',
                     pointerEvents: 'none',
                   }}
-                />
+                >
+                  <img
+                    src={`${overlay.imageUrl}${cacheBust}`}
+                    alt=""
+                    style={{
+                      position: 'absolute',
+                      width: `${imgWidthPct}%`,
+                      height: `${imgHeightPct}%`,
+                      left: `${imgLeftPct}%`,
+                      top: `${imgTopPct}%`,
+                    }}
+                  />
+                </div>
               );
-            }
-
-            const visibleW = 1 - overlay.cropLeft - overlay.cropRight;
-            const visibleH = 1 - overlay.cropTop - overlay.cropBottom;
-            const imgWidthPct = (1 / visibleW) * 100;
-            const imgHeightPct = (1 / visibleH) * 100;
-            const imgLeftPct = -(overlay.cropLeft / visibleW) * 100;
-            const imgTopPct = -(overlay.cropTop / visibleH) * 100;
-
-            return (
-              <div
-                key={overlay.id}
-                style={{
-                  position: 'absolute',
-                  left: `${overlay.x}%`,
-                  top: `${overlay.y}%`,
-                  width: `${overlay.width}%`,
-                  height: `${overlay.height}%`,
-                  overflow: 'hidden',
-                  pointerEvents: 'none',
-                }}
-              >
-                <img
-                  src={`${overlay.imageUrl}${cacheBust}`}
-                  alt=""
-                  style={{
-                    position: 'absolute',
-                    width: `${imgWidthPct}%`,
-                    height: `${imgHeightPct}%`,
-                    left: `${imgLeftPct}%`,
-                    top: `${imgTopPct}%`,
-                  }}
-                />
-              </div>
-            );
-          })}
-        </div>
+            })}
+          </div>
+        ) : currentSlideType === 'sow_totals' ? (
+          /* SOW totals summary slide */
+          <div style={{ width: '100%', height: '100%' }}>
+            <SOWTotalsSlide
+              content={currentSlideData?.content}
+              bgColor={bg}
+              client={meta.client}
+              sowMeta={currentSlideData?.content?.sowMeta}
+            />
+          </div>
+        ) : (
+          /* SOW category slide */
+          <div style={{ width: '100%', height: '100%' }}>
+            <SOWSlide
+              categoryId={currentSlideData?.sowCategoryId}
+              content={currentSlideData?.content}
+              bgColor={bg}
+            />
+          </div>
+        )}
 
         {/* Navigation overlays */}
         <div

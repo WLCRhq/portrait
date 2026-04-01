@@ -20,3 +20,24 @@ export async function requireDeckOwner(req, res, next) {
 
   next();
 }
+
+/**
+ * Middleware that checks if the current user owns the proposal.
+ * Reads proposalId from req.params.proposalId.
+ */
+export async function requireProposalOwner(req, res, next) {
+  const proposal = await prisma.proposal.findUnique({
+    where: { id: req.params.proposalId },
+    select: { userId: true },
+  });
+
+  if (!proposal) {
+    return res.status(404).json({ error: 'Proposal not found' });
+  }
+
+  if (proposal.userId !== req.session.userId) {
+    return res.status(403).json({ error: 'Only the proposal owner can perform this action' });
+  }
+
+  next();
+}

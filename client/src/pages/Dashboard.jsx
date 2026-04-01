@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import api, { setCsrfToken } from '../lib/api.js';
 import { useDecks } from '../hooks/useDecks.js';
-import { Plus, Trash2, RefreshCw, BarChart3, Link2, LogOut, Loader } from 'lucide-react';
+import { Plus, Trash2, RefreshCw, BarChart3, Link2, LogOut, Loader, FileText } from 'lucide-react';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -69,6 +69,9 @@ export default function Dashboard() {
           <img src="/portrait-logo.png" alt="Portrait" style={{ height: 72 }} />
           {user && <p style={{ fontSize: 14, marginTop: 6 }}>Welcome, {user.name}</p>}
         </div>
+        <Link to="/dashboard/proposals" className="btn btn-primary btn-sm">
+          <FileText size={14} /> Proposals
+        </Link>
         <button className="btn btn-secondary btn-sm" onClick={handleLogout}>
           <LogOut size={14} /> Logout
         </button>
