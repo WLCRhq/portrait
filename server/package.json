@@ -25,6 +25,7 @@
     "morgan": "^1.10.1",
     "nanoid": "^5.1.7",
     "pdf-to-img": "^5.0.0",
+    "ua-parser-js": "^2.0.9",
     "zod": "^4.3.6"
   },
   "devDependencies": {

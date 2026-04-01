@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import geoip from 'geoip-lite';
+import { UAParser } from 'ua-parser-js';
 import prisma from '../lib/prisma.js';
 import { viewerLimiter } from '../middleware/rateLimiter.js';
 import { getSlideImagePath } from '../services/storage.js';
@@ -17,6 +18,12 @@ const slideEventSchema = z.object({
 
 const endSessionSchema = z.object({
   sessionId: z.string().min(1),
+});
+
+const clientInfoSchema = z.object({
+  sessionId: z.string().min(1),
+  screenRes: z.string().max(20).optional(),
+  timezone: z.string().max(100).optional(),
 });
 
 const router = Router();
@@ -82,9 +89,16 @@ router.get('/:slug/meta', async (req, res) => {
     req.socket.remoteAddress || 'unknown';
 
   const userAgent = req.headers['user-agent'] || 'unknown';
+  const referrer = req.headers['referer'] || req.headers['referrer'] || null;
 
   // GeoIP lookup
   const geo = geoip.lookup(ip);
+
+  // Parse user agent
+  const ua = new UAParser(userAgent);
+  const browserInfo = ua.getBrowser();
+  const osInfo = ua.getOS();
+  const deviceInfo = ua.getDevice();
 
   // Create viewing session
   const session = await prisma.viewSession.create({
@@ -95,6 +109,11 @@ router.get('/:slug/meta', async (req, res) => {
       country: geo?.country || null,
       region: geo?.region || null,
       city: geo?.city || null,
+      timezone: geo?.timezone || null,
+      browser: browserInfo.name ? `${browserInfo.name} ${browserInfo.version || ''}`.trim() : null,
+      os: osInfo.name ? `${osInfo.name} ${osInfo.version || ''}`.trim() : null,
+      device: deviceInfo.type || 'desktop',
+      referrer,
     },
   });
 
@@ -195,6 +214,33 @@ router.post('/:slug/end', async (req, res) => {
   await prisma.viewSession.update({
     where: { id: sessionId },
     data: { endedAt, totalSeconds },
+  });
+
+  res.json({ ok: true });
+});
+
+// POST /api/view/:slug/clientinfo — Update session with client-side info (screen, timezone)
+router.post('/:slug/clientinfo', async (req, res) => {
+  const parsed = clientInfoSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: 'Invalid request' });
+  }
+
+  const { sessionId, screenRes, timezone } = parsed.data;
+
+  const session = await prisma.viewSession.findFirst({
+    where: { id: sessionId, link: { slug: req.params.slug } },
+  });
+  if (!session) {
+    return res.status(403).json({ error: 'Invalid session' });
+  }
+
+  await prisma.viewSession.update({
+    where: { id: sessionId },
+    data: {
+      ...(screenRes && { screenRes }),
+      ...(timezone && !session.timezone && { timezone }),
+    },
   });
 
   res.json({ ok: true });

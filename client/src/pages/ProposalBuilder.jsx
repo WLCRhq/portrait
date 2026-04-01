@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Save, Link2, GripVertical, ArrowUp, ArrowDown, Trash2, Plus, Image, FileText } from 'lucide-react';
 import { useProposal } from '../hooks/useProposals.js';
 import { useDecks } from '../hooks/useDecks.js';
-import api from '../lib/api.js';
+import api, { setCsrfToken } from '../lib/api.js';
 
 // --- Constants ---
 
@@ -20,54 +20,57 @@ const CATS = [
   { id: 'retainer', label: 'Retainer & Ongoing', color: '#639922' },
 ];
 
+// Categories excluded from PM percentage base (pass-through costs)
+const PM_EXCLUDED_CATS = ['infra', 'software', 'pm'];
+
 const DEFAULT_ROWS = {
   strategy: [
     { name: 'Brand strategy & positioning', unit: 'flat fee', qty: '1', rate: '', freq: 'one-time', passThrough: false, notes: '' },
-    { name: 'Discovery & research sprint', unit: 'hours', qty: '', rate: '', freq: 'one-time', passThrough: false, notes: '' },
+    { name: 'Discovery & research sprint', unit: 'hours', qty: '1', rate: '240', freq: 'one-time', passThrough: false, notes: '' },
     { name: 'Content strategy', unit: 'flat fee', qty: '1', rate: '', freq: 'one-time', passThrough: false, notes: '' },
     { name: 'Go-to-market strategy', unit: 'flat fee', qty: '1', rate: '', freq: 'one-time', passThrough: false, notes: '' },
   ],
   design: [
     { name: 'Brand identity & visual system', unit: 'flat fee', qty: '1', rate: '', freq: 'one-time', passThrough: false, notes: '' },
-    { name: 'UX research & wireframing', unit: 'hours', qty: '', rate: '', freq: 'one-time', passThrough: false, notes: '' },
-    { name: 'UI design', unit: 'hours', qty: '', rate: '', freq: 'one-time', passThrough: false, notes: '' },
-    { name: 'Prototyping', unit: 'hours', qty: '', rate: '', freq: 'one-time', passThrough: false, notes: '' },
-    { name: 'Design QA & handoff', unit: 'hours', qty: '', rate: '', freq: 'one-time', passThrough: false, notes: '' },
+    { name: 'UX research & wireframing', unit: 'hours', qty: '1', rate: '240', freq: 'one-time', passThrough: false, notes: '' },
+    { name: 'UI design', unit: 'hours', qty: '1', rate: '240', freq: 'one-time', passThrough: false, notes: '' },
+    { name: 'Prototyping', unit: 'hours', qty: '1', rate: '240', freq: 'one-time', passThrough: false, notes: '' },
+    { name: 'Design QA & handoff', unit: 'hours', qty: '1', rate: '240', freq: 'one-time', passThrough: false, notes: '' },
   ],
   marketing: [
-    { name: 'Paid media strategy & management', unit: 'months', qty: '', rate: '', freq: 'monthly', passThrough: false, notes: '' },
+    { name: 'Paid media strategy & management', unit: 'months', qty: '1', rate: '', freq: 'monthly', passThrough: false, notes: '' },
     { name: 'SEO strategy & implementation', unit: 'flat fee', qty: '1', rate: '', freq: 'one-time', passThrough: false, notes: '' },
-    { name: 'Email marketing & automation', unit: 'emails', qty: '', rate: '', freq: 'monthly', passThrough: false, notes: '' },
-    { name: 'Content creation & copywriting', unit: 'hours', qty: '', rate: '', freq: 'one-time', passThrough: false, notes: '' },
-    { name: 'Marketing analytics & reporting', unit: 'months', qty: '', rate: '', freq: 'monthly', passThrough: false, notes: '' },
+    { name: 'Email marketing & automation', unit: 'emails', qty: '1', rate: '', freq: 'monthly', passThrough: false, notes: '' },
+    { name: 'Content creation & copywriting', unit: 'hours', qty: '1', rate: '240', freq: 'one-time', passThrough: false, notes: '' },
+    { name: 'Marketing analytics & reporting', unit: 'months', qty: '1', rate: '', freq: 'monthly', passThrough: false, notes: '' },
   ],
   engineering: [
-    { name: 'Web / app development', unit: 'hours', qty: '', rate: '', freq: 'one-time', passThrough: false, notes: '' },
+    { name: 'Web / app development', unit: 'hours', qty: '1', rate: '240', freq: 'one-time', passThrough: false, notes: '' },
     { name: 'CMS implementation', unit: 'flat fee', qty: '1', rate: '', freq: 'one-time', passThrough: false, notes: '' },
-    { name: 'API development & integrations', unit: 'hours', qty: '', rate: '', freq: 'one-time', passThrough: false, notes: '' },
-    { name: 'QA testing', unit: 'hours', qty: '', rate: '', freq: 'one-time', passThrough: false, notes: '' },
-    { name: 'Performance optimization', unit: 'hours', qty: '', rate: '', freq: 'one-time', passThrough: false, notes: '' },
+    { name: 'API development & integrations', unit: 'hours', qty: '1', rate: '240', freq: 'one-time', passThrough: false, notes: '' },
+    { name: 'QA testing', unit: 'hours', qty: '1', rate: '240', freq: 'one-time', passThrough: false, notes: '' },
+    { name: 'Performance optimization', unit: 'hours', qty: '1', rate: '240', freq: 'one-time', passThrough: false, notes: '' },
   ],
   infra: [
-    { name: 'Hosting', unit: 'months', qty: '', rate: '', freq: 'monthly', passThrough: true, notes: 'Pass-through' },
-    { name: 'Domain registration & DNS', unit: 'domains', qty: '', rate: '', freq: 'annually', passThrough: true, notes: 'Pass-through' },
-    { name: 'Cloud infrastructure', unit: 'months', qty: '', rate: '', freq: 'monthly', passThrough: true, notes: 'Pass-through' },
-    { name: 'Database hosting', unit: 'months', qty: '', rate: '', freq: 'monthly', passThrough: true, notes: 'Pass-through' },
+    { name: 'Hosting', unit: 'months', qty: '1', rate: '', freq: 'monthly', passThrough: true, notes: 'Pass-through' },
+    { name: 'Domain registration & DNS', unit: 'domains', qty: '1', rate: '', freq: 'annually', passThrough: true, notes: 'Pass-through' },
+    { name: 'Cloud infrastructure', unit: 'months', qty: '1', rate: '', freq: 'monthly', passThrough: true, notes: 'Pass-through' },
+    { name: 'Database hosting', unit: 'months', qty: '1', rate: '', freq: 'monthly', passThrough: true, notes: 'Pass-through' },
   ],
   software: [
-    { name: 'Design tool licenses (Figma)', unit: 'seats', qty: '', rate: '', freq: 'monthly', passThrough: true, notes: 'Pass-through' },
-    { name: 'CMS platform license', unit: 'months', qty: '', rate: '', freq: 'monthly', passThrough: true, notes: 'Pass-through' },
-    { name: 'Analytics platform', unit: 'months', qty: '', rate: '', freq: 'monthly', passThrough: true, notes: 'Pass-through' },
+    { name: 'Design tool licenses (Figma)', unit: 'seats', qty: '1', rate: '', freq: 'monthly', passThrough: true, notes: 'Pass-through' },
+    { name: 'CMS platform license', unit: 'months', qty: '1', rate: '', freq: 'monthly', passThrough: true, notes: 'Pass-through' },
+    { name: 'Analytics platform', unit: 'months', qty: '1', rate: '', freq: 'monthly', passThrough: true, notes: 'Pass-through' },
   ],
   pm: [
-    { name: 'Project management', unit: 'hours', qty: '', rate: '', freq: 'one-time', passThrough: false, notes: '' },
-    { name: 'Account management', unit: 'months', qty: '', rate: '', freq: 'monthly', passThrough: false, notes: '' },
-    { name: 'Stakeholder facilitation', unit: 'hours', qty: '', rate: '', freq: 'one-time', passThrough: false, notes: '' },
+    { name: 'Project management', unit: 'hours', qty: '1', rate: '240', freq: 'one-time', passThrough: false, notes: '', calcMode: 'fixed' },
+    { name: 'Account management', unit: 'months', qty: '1', rate: '', freq: 'monthly', passThrough: false, notes: '', calcMode: 'fixed' },
+    { name: 'Stakeholder facilitation', unit: 'hours', qty: '1', rate: '240', freq: 'one-time', passThrough: false, notes: '', calcMode: 'fixed' },
   ],
   retainer: [
-    { name: 'Design retainer', unit: 'hours', qty: '', rate: '', freq: 'monthly', passThrough: false, notes: '' },
-    { name: 'Engineering retainer', unit: 'hours', qty: '', rate: '', freq: 'monthly', passThrough: false, notes: '' },
-    { name: 'Maintenance & support SLA', unit: 'months', qty: '', rate: '', freq: 'monthly', passThrough: false, notes: '' },
+    { name: 'Design retainer', unit: 'hours', qty: '1', rate: '240', freq: 'monthly', passThrough: false, notes: '' },
+    { name: 'Engineering retainer', unit: 'hours', qty: '1', rate: '240', freq: 'monthly', passThrough: false, notes: '' },
+    { name: 'Maintenance & support SLA', unit: 'months', qty: '1', rate: '', freq: 'monthly', passThrough: false, notes: '' },
   ],
 };
 
@@ -76,11 +79,33 @@ function fmtCurrency(v) {
   return '$' + Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function calcLineTotal(row) {
+function calcLineTotal(row, percentBase) {
+  if (row.calcMode === 'percent_onetime' || row.calcMode === 'percent_monthly') {
+    const pct = parseFloat(row.rate);
+    if (!pct || !percentBase) return null;
+    return (pct / 100) * percentBase;
+  }
   const q = parseFloat(row.qty);
   const r = parseFloat(row.rate);
   if (!q || !r) return null;
   return q * r;
+}
+
+// Calculate the base totals that PM percentages apply to (excludes infra, software, pm)
+function calcPercentBases(sections) {
+  let oneTime = 0;
+  let monthly = 0;
+  for (const [catId, sec] of Object.entries(sections)) {
+    if (PM_EXCLUDED_CATS.includes(catId) || !sec.included) continue;
+    for (const row of sec.rows) {
+      if (!row.name) continue;
+      const t = calcLineTotal(row);
+      if (!t) continue;
+      if (row.freq === 'one-time' || row.freq === 'per project') oneTime += t;
+      else monthly += t;
+    }
+  }
+  return { oneTime, monthly };
 }
 
 // --- Main Component ---
@@ -92,6 +117,13 @@ export default function ProposalBuilder() {
   const [activeTab, setActiveTab] = useState('setup');
   const [saving, setSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState(null);
+
+  // Ensure CSRF token is available for mutations
+  useEffect(() => {
+    api.get('/auth/me').then(res => {
+      if (res.data.csrfToken) setCsrfToken(res.data.csrfToken);
+    }).catch(() => {});
+  }, []);
 
   // Local editable state
   const [title, setTitle] = useState('');
@@ -213,12 +245,16 @@ export default function ProposalBuilder() {
   };
 
   const addRow = (catId) => {
+    const isHourly = !['infra', 'software'].includes(catId);
+    const newRow = {
+      _id: Math.random().toString(36).slice(2),
+      name: '', unit: isHourly ? 'hours' : 'months', qty: '1',
+      rate: isHourly ? '240' : '', freq: 'one-time', passThrough: false, notes: '',
+      ...(catId === 'pm' && { calcMode: 'fixed' }),
+    };
     setSowSections(prev => ({
       ...prev,
-      [catId]: {
-        ...prev[catId],
-        rows: [...prev[catId].rows, { _id: Math.random().toString(36).slice(2), name: '', unit: 'hours', qty: '', rate: '', freq: 'one-time', passThrough: false, notes: '' }],
-      },
+      [catId]: { ...prev[catId], rows: [...prev[catId].rows, newRow] },
     }));
   };
 
@@ -365,6 +401,7 @@ export default function ProposalBuilder() {
           removeRow={removeRow}
           saving={saving}
           onSave={saveSOW}
+          allSections={sowSections}
         />
       )}
 
@@ -372,7 +409,7 @@ export default function ProposalBuilder() {
       {activeTab === 'arrange' && (
         <ArrangeTab
           slideOrder={slideOrder}
-          moveSlide={moveSlide}
+          setSlideOrder={setSlideOrder}
           removeSlide={removeSlide}
           buildSlideOrder={buildSlideOrder}
           deckId={deckId}
@@ -450,8 +487,16 @@ function SetupTab({ title, setTitle, client, setClient, deckId, setDeckId, sowMe
   );
 }
 
-function SOWTab({ sections, toggleSection, updateRow, addRow, removeRow, saving, onSave }) {
+function SOWTab({ sections, toggleSection, updateRow, addRow, removeRow, saving, onSave, allSections }) {
   const [expandedCat, setExpandedCat] = useState(null);
+  const percentBases = calcPercentBases(allSections);
+
+  const isPm = (catId) => catId === 'pm';
+  const CALC_MODES = [
+    { value: 'fixed', label: 'Fixed' },
+    { value: 'percent_onetime', label: '% of one-time fees' },
+    { value: 'percent_monthly', label: '% of monthly fees' },
+  ];
 
   return (
     <div>
@@ -463,7 +508,8 @@ function SOWTab({ sections, toggleSection, updateRow, addRow, removeRow, saving,
         const sec = sections[cat.id];
         const isExpanded = expandedCat === cat.id;
         const subtotal = sec.rows.filter(r => r.name).reduce((acc, r) => {
-          const t = calcLineTotal(r);
+          const base = r.calcMode === 'percent_onetime' ? percentBases.oneTime : r.calcMode === 'percent_monthly' ? percentBases.monthly : undefined;
+          const t = calcLineTotal(r, base);
           return t ? acc + t : acc;
         }, 0);
 
@@ -505,41 +551,86 @@ function SOWTab({ sections, toggleSection, updateRow, addRow, removeRow, saving,
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                   <thead>
                     <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                      {['Line item', 'Unit', 'Qty', 'Rate', 'Freq', 'Pass-through', 'Notes', ''].map(h => (
+                      {[
+                        'Line item',
+                        ...(isPm(cat.id) ? ['Pricing'] : []),
+                        'Unit', 'Qty',
+                        isPm(cat.id) ? 'Rate / %' : 'Rate',
+                        'Freq', 'Pass-through', 'Notes', '',
+                      ].map(h => (
                         <th key={h} style={{ padding: '6px 8px', textAlign: 'left', fontSize: 12, fontWeight: 500, color: 'var(--text)', whiteSpace: 'nowrap' }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {sec.rows.map(row => (
-                      <tr key={row._id} style={{ borderBottom: '1px solid var(--border)' }}>
-                        <td style={{ padding: '4px 6px' }}><input value={row.name} onChange={e => updateRow(cat.id, row._id, 'name', e.target.value)} placeholder="Line item" style={{ fontSize: 13 }} /></td>
-                        <td style={{ padding: '4px 6px', width: 110 }}>
-                          <select value={row.unit} onChange={e => updateRow(cat.id, row._id, 'unit', e.target.value)} style={{ fontSize: 13 }}>
-                            {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
-                          </select>
-                        </td>
-                        <td style={{ padding: '4px 6px', width: 70 }}><input type="number" value={row.qty} onChange={e => updateRow(cat.id, row._id, 'qty', e.target.value)} placeholder="\u2014" min="0" style={{ fontSize: 13, textAlign: 'right' }} /></td>
-                        <td style={{ padding: '4px 6px', width: 90 }}><input type="number" value={row.rate} onChange={e => updateRow(cat.id, row._id, 'rate', e.target.value)} placeholder="0.00" min="0" style={{ fontSize: 13, textAlign: 'right' }} /></td>
-                        <td style={{ padding: '4px 6px', width: 110 }}>
-                          <select value={row.freq} onChange={e => updateRow(cat.id, row._id, 'freq', e.target.value)} style={{ fontSize: 13 }}>
-                            {FREQ.map(f => <option key={f} value={f}>{f}</option>)}
-                          </select>
-                        </td>
-                        <td style={{ padding: '4px 6px', width: 40, textAlign: 'center' }}>
-                          <input type="checkbox" checked={row.passThrough} onChange={e => updateRow(cat.id, row._id, 'passThrough', e.target.checked)} style={{ accentColor: '#1D9E75' }} />
-                        </td>
-                        <td style={{ padding: '4px 6px' }}><input value={row.notes} onChange={e => updateRow(cat.id, row._id, 'notes', e.target.value)} placeholder="Notes..." style={{ fontSize: 13 }} /></td>
-                        <td style={{ padding: '4px 6px', width: 30, textAlign: 'center' }}>
-                          <button onClick={() => removeRow(cat.id, row._id)} style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', fontSize: 14, padding: 0 }}>&times;</button>
-                        </td>
-                      </tr>
-                    ))}
+                    {sec.rows.map(row => {
+                      const isPercent = row.calcMode === 'percent_onetime' || row.calcMode === 'percent_monthly';
+                      const base = row.calcMode === 'percent_onetime' ? percentBases.oneTime : row.calcMode === 'percent_monthly' ? percentBases.monthly : undefined;
+                      const lineTotal = calcLineTotal(row, base);
+
+                      return (
+                        <tr key={row._id} style={{ borderBottom: '1px solid var(--border)' }}>
+                          <td style={{ padding: '4px 6px' }}><input value={row.name} onChange={e => updateRow(cat.id, row._id, 'name', e.target.value)} placeholder="Line item" style={{ fontSize: 13 }} /></td>
+                          {isPm(cat.id) && (
+                            <td style={{ padding: '4px 6px', width: 150 }}>
+                              <select value={row.calcMode || 'fixed'} onChange={e => updateRow(cat.id, row._id, 'calcMode', e.target.value)} style={{ fontSize: 12 }}>
+                                {CALC_MODES.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                              </select>
+                            </td>
+                          )}
+                          <td style={{ padding: '4px 6px', width: 110 }}>
+                            {isPercent ? (
+                              <span style={{ fontSize: 12, color: 'var(--text)' }}>
+                                {row.calcMode === 'percent_onetime' ? `of ${fmtCurrency(percentBases.oneTime)}` : `of ${fmtCurrency(percentBases.monthly)}`}
+                              </span>
+                            ) : (
+                              <select value={row.unit} onChange={e => updateRow(cat.id, row._id, 'unit', e.target.value)} style={{ fontSize: 13 }}>
+                                {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                              </select>
+                            )}
+                          </td>
+                          <td style={{ padding: '4px 6px', width: 70 }}>
+                            {isPercent ? (
+                              <span style={{ fontSize: 12, color: 'var(--text)', textAlign: 'right', display: 'block' }}>{lineTotal ? fmtCurrency(lineTotal) : '\u2014'}</span>
+                            ) : (
+                              <input type="number" value={row.qty} onChange={e => updateRow(cat.id, row._id, 'qty', e.target.value)} placeholder="1" min="0" style={{ fontSize: 13, textAlign: 'right' }} />
+                            )}
+                          </td>
+                          <td style={{ padding: '4px 6px', width: 90 }}>
+                            <div style={{ position: 'relative' }}>
+                              <input type="number" value={row.rate} onChange={e => updateRow(cat.id, row._id, 'rate', e.target.value)} placeholder={isPercent ? '10' : '0.00'} min="0" style={{ fontSize: 13, textAlign: 'right', paddingRight: isPercent ? 20 : undefined }} />
+                              {isPercent && <span style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', fontSize: 12, color: 'var(--text)', pointerEvents: 'none' }}>%</span>}
+                            </div>
+                          </td>
+                          <td style={{ padding: '4px 6px', width: 110 }}>
+                            {isPercent ? (
+                              <span style={{ fontSize: 12, color: 'var(--text)' }}>{row.calcMode === 'percent_onetime' ? 'one-time' : 'monthly'}</span>
+                            ) : (
+                              <select value={row.freq} onChange={e => updateRow(cat.id, row._id, 'freq', e.target.value)} style={{ fontSize: 13 }}>
+                                {FREQ.map(f => <option key={f} value={f}>{f}</option>)}
+                              </select>
+                            )}
+                          </td>
+                          <td style={{ padding: '4px 6px', width: 40, textAlign: 'center' }}>
+                            <input type="checkbox" checked={row.passThrough} onChange={e => updateRow(cat.id, row._id, 'passThrough', e.target.checked)} style={{ accentColor: '#1D9E75' }} />
+                          </td>
+                          <td style={{ padding: '4px 6px' }}><input value={row.notes} onChange={e => updateRow(cat.id, row._id, 'notes', e.target.value)} placeholder="Notes..." style={{ fontSize: 13 }} /></td>
+                          <td style={{ padding: '4px 6px', width: 30, textAlign: 'center' }}>
+                            <button onClick={() => removeRow(cat.id, row._id)} style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', fontSize: 14, padding: 0 }}>&times;</button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
                 <button onClick={() => addRow(cat.id)} style={{ fontSize: 12, color: 'var(--text)', background: 'none', border: '1px dashed var(--border)', borderRadius: 'var(--radius)', padding: '4px 12px', marginTop: 8, cursor: 'pointer' }}>
                   + add line item
                 </button>
+                {isPm(cat.id) && (percentBases.oneTime > 0 || percentBases.monthly > 0) && (
+                  <div style={{ fontSize: 11, color: 'var(--text)', marginTop: 8, padding: '6px 0', borderTop: '1px solid var(--border)' }}>
+                    Percentage bases (excl. infra, software, PM): one-time {fmtCurrency(percentBases.oneTime)} &middot; monthly {fmtCurrency(percentBases.monthly)}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -555,7 +646,10 @@ function SOWTab({ sections, toggleSection, updateRow, addRow, removeRow, saving,
   );
 }
 
-function ArrangeTab({ slideOrder, moveSlide, removeSlide, buildSlideOrder, deckId, saving, onSave }) {
+function ArrangeTab({ slideOrder, setSlideOrder, removeSlide, buildSlideOrder, deckId, saving, onSave }) {
+  const [dragIndex, setDragIndex] = useState(null);
+  const [overIndex, setOverIndex] = useState(null);
+
   const catInfo = {
     strategy: { label: 'Strategy & Discovery', color: '#7F77DD' },
     design: { label: 'Design & Creative', color: '#D4537E' },
@@ -565,6 +659,41 @@ function ArrangeTab({ slideOrder, moveSlide, removeSlide, buildSlideOrder, deckI
     software: { label: 'Software Licenses & Tools', color: '#888780' },
     pm: { label: 'Project Management & Ops', color: '#D85A30' },
     retainer: { label: 'Retainer & Ongoing', color: '#639922' },
+  };
+
+  const handleDragStart = (e, index) => {
+    setDragIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+    // Make the drag image slightly transparent
+    if (e.currentTarget) {
+      e.dataTransfer.setDragImage(e.currentTarget, 0, 0);
+    }
+  };
+
+  const handleDragOver = (e, index) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (index !== overIndex) setOverIndex(index);
+  };
+
+  const handleDrop = (e, dropIndex) => {
+    e.preventDefault();
+    if (dragIndex === null || dragIndex === dropIndex) {
+      setDragIndex(null);
+      setOverIndex(null);
+      return;
+    }
+    const newOrder = [...slideOrder];
+    const [dragged] = newOrder.splice(dragIndex, 1);
+    newOrder.splice(dropIndex, 0, dragged);
+    setSlideOrder(newOrder);
+    setDragIndex(null);
+    setOverIndex(null);
+  };
+
+  const handleDragEnd = () => {
+    setDragIndex(null);
+    setOverIndex(null);
   };
 
   return (
@@ -585,12 +714,32 @@ function ArrangeTab({ slideOrder, moveSlide, removeSlide, buildSlideOrder, deckI
           </p>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           {slideOrder.map((slide, i) => {
             const cat = slide.sowCategoryId ? catInfo[slide.sowCategoryId] : null;
+            const isDragging = dragIndex === i;
+            const isOver = overIndex === i && dragIndex !== i;
+
             return (
-              <div key={slide._id || i} className="card" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px' }}>
-                <span style={{ fontSize: 13, color: 'var(--text)', fontWeight: 500, width: 28, textAlign: 'center' }}>{i + 1}</span>
+              <div
+                key={slide._id || i}
+                draggable
+                onDragStart={(e) => handleDragStart(e, i)}
+                onDragOver={(e) => handleDragOver(e, i)}
+                onDrop={(e) => handleDrop(e, i)}
+                onDragEnd={handleDragEnd}
+                className="card"
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px',
+                  cursor: 'grab',
+                  opacity: isDragging ? 0.4 : 1,
+                  borderTop: isOver && dragIndex > i ? '2px solid var(--accent)' : undefined,
+                  borderBottom: isOver && dragIndex < i ? '2px solid var(--accent)' : undefined,
+                  transition: 'border 0.1s ease',
+                }}
+              >
+                <GripVertical size={14} color="var(--text)" style={{ flexShrink: 0, opacity: 0.4 }} />
+                <span style={{ fontSize: 13, color: 'var(--text)', fontWeight: 500, width: 24, textAlign: 'center', flexShrink: 0 }}>{i + 1}</span>
 
                 {slide.type === 'deck_slide' ? (
                   <>
@@ -603,6 +752,7 @@ function ArrangeTab({ slideOrder, moveSlide, removeSlide, buildSlideOrder, deckI
                         src={`/api/decks/${deckId}/slides/${slide.sourceSlideIndex}/image`}
                         alt=""
                         style={{ height: 40, borderRadius: 4, border: '1px solid var(--border)' }}
+                        draggable={false}
                       />
                     )}
                   </>
@@ -621,17 +771,9 @@ function ArrangeTab({ slideOrder, moveSlide, removeSlide, buildSlideOrder, deckI
                   </>
                 )}
 
-                <div style={{ display: 'flex', gap: 4 }}>
-                  <button className="btn btn-secondary btn-sm" style={{ padding: '4px 6px' }} onClick={() => moveSlide(i, -1)} disabled={i === 0}>
-                    <ArrowUp size={12} />
-                  </button>
-                  <button className="btn btn-secondary btn-sm" style={{ padding: '4px 6px' }} onClick={() => moveSlide(i, 1)} disabled={i === slideOrder.length - 1}>
-                    <ArrowDown size={12} />
-                  </button>
-                  <button className="btn btn-danger btn-sm" style={{ padding: '4px 6px' }} onClick={() => removeSlide(i)}>
-                    <Trash2 size={12} />
-                  </button>
-                </div>
+                <button className="btn btn-danger btn-sm" style={{ padding: '4px 6px' }} onClick={() => removeSlide(i)}>
+                  <Trash2 size={12} />
+                </button>
               </div>
             );
           })}
@@ -639,7 +781,7 @@ function ArrangeTab({ slideOrder, moveSlide, removeSlide, buildSlideOrder, deckI
       )}
 
       <p style={{ fontSize: 12, color: 'var(--text)', marginTop: 12 }}>
-        Total: {slideOrder.length} slide{slideOrder.length !== 1 ? 's' : ''}. Use arrows to reorder, trash to remove.
+        Total: {slideOrder.length} slide{slideOrder.length !== 1 ? 's' : ''}. Drag to reorder.
       </p>
     </div>
   );

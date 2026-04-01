@@ -1,13 +1,20 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useProposals } from '../hooks/useProposals.js';
 import { useDecks } from '../hooks/useDecks.js';
+import api, { setCsrfToken } from '../lib/api.js';
 import { Plus, Trash2, FileText, ArrowLeft } from 'lucide-react';
 
 export default function Proposals() {
   const navigate = useNavigate();
   const { proposals, loading, createProposal, deleteProposal } = useProposals();
   const { decks } = useDecks();
+
+  useEffect(() => {
+    api.get('/auth/me').then(res => {
+      if (res.data.csrfToken) setCsrfToken(res.data.csrfToken);
+    }).catch(() => navigate('/'));
+  }, [navigate]);
   const [showCreate, setShowCreate] = useState(false);
   const [title, setTitle] = useState('');
   const [client, setClient] = useState('');

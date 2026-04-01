@@ -33,6 +33,14 @@ export default function Viewer() {
       .then((res) => {
         setMeta(res.data);
         setSessionId(res.data.sessionId);
+
+        // Send client-side info (screen resolution, timezone)
+        const clientInfo = {
+          sessionId: res.data.sessionId,
+          screenRes: `${window.screen.width}x${window.screen.height}`,
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        };
+        axios.post(`/api/view/${slug}/clientinfo`, clientInfo).catch(() => {});
       })
       .catch((err) => {
         setError(err.response?.data?.error || 'Failed to load presentation');
@@ -209,6 +217,18 @@ export default function Viewer() {
         display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh',
       }}>
         <LoadingSpinner />
+      </div>
+    );
+  }
+
+  if (meta.slideCount === 0) {
+    return (
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        minHeight: '100vh', flexDirection: 'column', gap: 16, padding: 24,
+      }}>
+        <h2>This presentation has no slides yet</h2>
+        <p style={{ color: '#888' }}>The author is still building this proposal.</p>
       </div>
     );
   }

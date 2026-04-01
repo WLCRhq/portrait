@@ -110,7 +110,6 @@ router.get('/:proposalId', async (req, res) => {
     where: { id: req.params.proposalId },
     include: {
       deck: {
-        select: { id: true, title: true, slideCount: true, bgColor: true, exportedAt: true, exportStatus: true },
         include: { slides: { orderBy: { index: 'asc' }, select: { id: true, index: true, imageUrl: true } } },
       },
       slides: { orderBy: { index: 'asc' } },

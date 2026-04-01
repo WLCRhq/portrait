@@ -86,6 +86,13 @@ model ViewSession {
   country      String?
   region       String?
   city         String?
+  timezone     String?
+  isp          String?
+  browser      String?
+  os           String?
+  device       String?
+  screenRes    String?
+  referrer     String?
   startedAt    DateTime     @default(now())
   endedAt      DateTime?
   totalSeconds Int?
