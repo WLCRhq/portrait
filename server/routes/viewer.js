@@ -31,6 +31,19 @@ const router = Router();
 // Apply rate limiting to all viewer endpoints
 router.use(viewerLimiter);
 
+// Fire-and-forget ISP lookup via ip-api.com; updates session after response
+function lookupIsp(ip, sessionId) {
+  if (!ip || ip === 'unknown' || ip.startsWith('127.') || ip.startsWith('::1') || ip.startsWith('192.168.') || ip.startsWith('10.')) return;
+  fetch(`http://ip-api.com/json/${encodeURIComponent(ip)}?fields=org`)
+    .then(r => r.json())
+    .then(data => {
+      if (data?.org) {
+        prisma.viewSession.update({ where: { id: sessionId }, data: { isp: data.org } }).catch(() => {});
+      }
+    })
+    .catch(() => {});
+}
+
 // Helper: validate slug and check link is active/not expired
 async function resolveLink(slug) {
   const link = await prisma.shareLink.findUnique({
@@ -116,6 +129,9 @@ router.get('/:slug/meta', async (req, res) => {
       referrer,
     },
   });
+
+  // Async ISP lookup (non-blocking — updates session when it resolves)
+  lookupIsp(ip, session.id);
 
   if (type === 'proposal') {
     const proposal = link.proposal;
