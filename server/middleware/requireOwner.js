@@ -5,20 +5,20 @@ import prisma from '../lib/prisma.js';
  * Returns 403 if they don't. Reads deckId from req.params.deckId.
  */
 export async function requireDeckOwner(req, res, next) {
-  const deck = await prisma.deck.findUnique({
-    where: { id: req.params.deckId },
-    select: { userId: true },
-  });
+  const [deck, user] = await Promise.all([
+    prisma.deck.findUnique({ where: { id: req.params.deckId }, select: { userId: true } }),
+    prisma.user.findUnique({ where: { id: req.session.userId }, select: { role: true } }),
+  ]);
 
   if (!deck) {
     return res.status(404).json({ error: 'Deck not found' });
   }
 
-  if (deck.userId !== req.session.userId) {
-    return res.status(403).json({ error: 'Only the deck owner can perform this action' });
+  if (user?.role === 'admin' || deck.userId === req.session.userId) {
+    return next();
   }
 
-  next();
+  return res.status(403).json({ error: 'Only the deck owner can perform this action' });
 }
 
 /**
@@ -26,18 +26,18 @@ export async function requireDeckOwner(req, res, next) {
  * Reads proposalId from req.params.proposalId.
  */
 export async function requireProposalOwner(req, res, next) {
-  const proposal = await prisma.proposal.findUnique({
-    where: { id: req.params.proposalId },
-    select: { userId: true },
-  });
+  const [proposal, user] = await Promise.all([
+    prisma.proposal.findUnique({ where: { id: req.params.proposalId }, select: { userId: true } }),
+    prisma.user.findUnique({ where: { id: req.session.userId }, select: { role: true } }),
+  ]);
 
   if (!proposal) {
     return res.status(404).json({ error: 'Proposal not found' });
   }
 
-  if (proposal.userId !== req.session.userId) {
-    return res.status(403).json({ error: 'Only the proposal owner can perform this action' });
+  if (user?.role === 'admin' || proposal.userId === req.session.userId) {
+    return next();
   }
 
-  next();
+  return res.status(403).json({ error: 'Only the proposal owner can perform this action' });
 }

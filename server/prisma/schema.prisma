@@ -12,6 +12,7 @@ model User {
   googleId     String     @unique
   email        String     @unique
   name         String
+  role         String     @default("user")
   accessToken  String
   refreshToken String
   createdAt    DateTime   @default(now())
