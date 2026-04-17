@@ -11,6 +11,7 @@ export default function LinkManager() {
   const [expiresAt, setExpiresAt] = useState('');
   const [creating, setCreating] = useState(false);
   const [copiedId, setCopiedId] = useState(null);
+  const [error, setError] = useState(null);
 
   const fetchLinks = useCallback(async () => {
     try {
@@ -43,13 +44,21 @@ export default function LinkManager() {
   };
 
   const toggleLink = async (linkId, currentActive) => {
-    await api.patch(`/api/decks/${deckId}/links/${linkId}`, { active: !currentActive });
-    setLinks((prev) => prev.map((l) => l.id === linkId ? { ...l, active: !currentActive } : l));
+    try {
+      await api.patch(`/api/decks/${deckId}/links/${linkId}`, { active: !currentActive });
+      setLinks((prev) => prev.map((l) => l.id === linkId ? { ...l, active: !currentActive } : l));
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to update link');
+    }
   };
 
   const deleteLink = async (linkId) => {
-    await api.delete(`/api/decks/${deckId}/links/${linkId}`);
-    setLinks((prev) => prev.filter((l) => l.id !== linkId));
+    try {
+      await api.delete(`/api/decks/${deckId}/links/${linkId}`);
+      setLinks((prev) => prev.filter((l) => l.id !== linkId));
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to delete link');
+    }
   };
 
   const copyToClipboard = (link) => {
@@ -70,6 +79,13 @@ export default function LinkManager() {
           <BarChart3 size={14} /> Analytics
         </Link>
       </header>
+
+      {error && (
+        <div style={{ marginBottom: 16, padding: '10px 14px', borderRadius: 'var(--radius)', background: 'rgba(220,53,69,0.12)', border: '1px solid var(--danger)', color: 'var(--danger)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 14 }}>
+          <span>{error}</span>
+          <button onClick={() => setError(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, lineHeight: 1, color: 'inherit', padding: 0 }}>&times;</button>
+        </div>
+      )}
 
       {/* Create form */}
       <div className="card" style={{ marginBottom: 24 }}>

@@ -420,7 +420,7 @@ export default function ProposalBuilder() {
 
       {/* Links Tab */}
       {activeTab === 'links' && (
-        <LinksTab proposalId={proposalId} />
+        <LinksTab proposalId={proposalId} error={error} setError={setError} />
       )}
     </div>
   );
@@ -787,7 +787,7 @@ function ArrangeTab({ slideOrder, setSlideOrder, removeSlide, buildSlideOrder, d
   );
 }
 
-function LinksTab({ proposalId }) {
+function LinksTab({ proposalId, error, setError }) {
   const [links, setLinks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -819,13 +819,21 @@ function LinksTab({ proposalId }) {
   };
 
   const toggleActive = async (linkId, active) => {
-    await api.patch(`/api/proposals/${proposalId}/links/${linkId}`, { active });
-    setLinks(prev => prev.map(l => l.id === linkId ? { ...l, active } : l));
+    try {
+      await api.patch(`/api/proposals/${proposalId}/links/${linkId}`, { active });
+      setLinks(prev => prev.map(l => l.id === linkId ? { ...l, active } : l));
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to update link');
+    }
   };
 
   const deleteLink = async (linkId) => {
-    await api.delete(`/api/proposals/${proposalId}/links/${linkId}`);
-    setLinks(prev => prev.filter(l => l.id !== linkId));
+    try {
+      await api.delete(`/api/proposals/${proposalId}/links/${linkId}`);
+      setLinks(prev => prev.filter(l => l.id !== linkId));
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to delete link');
+    }
   };
 
   const copyUrl = (slug) => {
@@ -837,6 +845,12 @@ function LinksTab({ proposalId }) {
 
   return (
     <div>
+      {error && (
+        <div style={{ marginBottom: 16, padding: '10px 14px', borderRadius: 'var(--radius)', background: 'rgba(220,53,69,0.12)', border: '1px solid var(--danger)', color: 'var(--danger)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 14 }}>
+          <span>{error}</span>
+          <button onClick={() => setError(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, lineHeight: 1, color: 'inherit', padding: 0 }}>&times;</button>
+        </div>
+      )}
       <div className="card" style={{ marginBottom: 16 }}>
         <h3 style={{ fontSize: 16, marginBottom: 12 }}>Create Share Link</h3>
         <div style={{ display: 'flex', gap: 8 }}>
