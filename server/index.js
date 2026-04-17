@@ -15,8 +15,10 @@ import linkRoutes from './routes/links.js';
 import proposalRoutes from './routes/proposals.js';
 import analyticsRoutes from './routes/analytics.js';
 import viewerRoutes from './routes/viewer.js';
+import adminRoutes from './routes/admin.js';
 import { requireAuth } from './middleware/auth.js';
 import { validateCsrf } from './middleware/csrf.js';
+import { requireAdmin } from './middleware/requireOwner.js';
 import { runDataRetention } from './jobs/dataRetention.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -77,6 +79,9 @@ app.use('/api/decks', requireAuth, apiLimiter, validateCsrf, linkRoutes);
 
 // Proposal routes (CRUD + links + slide ordering)
 app.use('/api/proposals', requireAuth, apiLimiter, validateCsrf, proposalRoutes);
+
+// Admin routes (admin role required)
+app.use('/api/admin', requireAuth, apiLimiter, validateCsrf, requireAdmin, adminRoutes);
 
 // Health check
 app.get('/api/health', (_req, res) => {

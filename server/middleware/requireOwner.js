@@ -1,5 +1,16 @@
 import prisma from '../lib/prisma.js';
 
+export async function requireAdmin(req, res, next) {
+  const user = await prisma.user.findUnique({
+    where: { id: req.session.userId },
+    select: { role: true },
+  });
+  if (user?.role !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+  next();
+}
+
 /**
  * Middleware that checks if the current user owns the deck.
  * Returns 403 if they don't. Reads deckId from req.params.deckId.

@@ -6,6 +6,7 @@ import DeckDetail from './pages/DeckDetail.jsx';
 import LinkManager from './pages/LinkManager.jsx';
 import Proposals from './pages/Proposals.jsx';
 import ProposalBuilder from './pages/ProposalBuilder.jsx';
+import AdminUsers from './pages/AdminUsers.jsx';
 import Viewer from './pages/Viewer.jsx';
 import api, { setCsrfToken } from './lib/api.js';
 
@@ -25,6 +26,7 @@ export default function App() {
       <Route path="/dashboard/decks/:deckId/links" element={<LinkManager />} />
       <Route path="/dashboard/proposals" element={<Proposals />} />
       <Route path="/dashboard/proposals/:proposalId" element={<ProposalBuilder />} />
+      <Route path="/dashboard/admin/users" element={<AdminUsers />} />
       <Route path="/view/:slug" element={<Viewer />} />
     </Routes>
   );
