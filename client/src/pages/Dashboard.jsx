@@ -69,6 +69,7 @@ export default function Dashboard() {
           <img src="/portrait-logo.png" alt="Portrait" style={{ height: 72 }} />
           {user && <p style={{ fontSize: 14, marginTop: 6 }}>Welcome, {user.name}</p>}
         </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32 }}>
         <Link to="/dashboard/proposals" className="btn btn-primary btn-sm">
           <FileText size={14} /> Proposals
         </Link>
@@ -80,6 +81,7 @@ export default function Dashboard() {
         <button className="btn btn-secondary btn-sm" onClick={handleLogout}>
           <LogOut size={14} /> Logout
         </button>
+        </div>
       </header>
 
       {/* Import form */}
