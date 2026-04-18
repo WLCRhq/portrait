@@ -69,7 +69,7 @@ export default function Dashboard() {
           <img src="/portrait-logo.png" alt="Portrait" style={{ height: 72 }} />
           {user && <p style={{ fontSize: 14, marginTop: 6, width: '100%' }}>Welcome, {user.name}</p>}
         </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <Link to="/dashboard/proposals" className="btn btn-primary btn-sm">
           <FileText size={14} /> Proposals
         </Link>
