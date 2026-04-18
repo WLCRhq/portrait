@@ -65,9 +65,9 @@ export default function Dashboard() {
   return (
     <div className="container">
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32 }}>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'center' }}>
           <img src="/portrait-logo.png" alt="Portrait" style={{ height: 72 }} />
-          {user && <p style={{ fontSize: 14, marginTop: 6 }}>Welcome, {user.name}</p>}
+          {user && <p style={{ fontSize: 14, marginTop: 6, width: '100%' }}>Welcome, {user.name}</p>}
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32 }}>
         <Link to="/dashboard/proposals" className="btn btn-primary btn-sm">
