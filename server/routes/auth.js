@@ -29,7 +29,7 @@ router.get('/google', (req, res) => {
       'https://www.googleapis.com/auth/userinfo.email',
       'https://www.googleapis.com/auth/userinfo.profile',
       'https://www.googleapis.com/auth/presentations.readonly',
-      'https://www.googleapis.com/auth/drive.file',
+      'https://www.googleapis.com/auth/drive.readonly',
     ],
   });
   res.redirect(authorizeUrl);
