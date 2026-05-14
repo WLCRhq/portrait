@@ -25,7 +25,7 @@ async function processExport({ deckId, userId, presentationId, pages, pageWidth,
       pdfSlideBuffers = await exportSlidesFromPdf(authClient, presentationId, pages.length);
       console.log(`[Export] PDF export succeeded: ${pdfSlideBuffers.length} pages`);
     } catch (err) {
-      console.warn(`[Export] PDF export failed, falling back to thumbnails:`, err.message);
+      console.warn(`[Export] ⚠️  PDF export failed — falling back to low-res thumbnails (1600x900 max). Check OAuth scopes or re-authenticate. Error: ${err.message}`);
     }
 
     for (let i = 0; i < pages.length; i++) {
