@@ -1,19 +1,34 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../lib/api.js';
-import { ArrowLeft, Shield, User } from 'lucide-react';
+import { ArrowLeft, Shield, User, RefreshCw } from 'lucide-react';
 
 export default function AdminUsers() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [updatingId, setUpdatingId] = useState(null);
+  const [reexporting, setReexporting] = useState(false);
+  const [reexportResult, setReexportResult] = useState(null);
 
   useEffect(() => {
     api.get('/api/admin/users')
       .then(res => { setUsers(res.data); setLoading(false); })
       .catch(() => { setError('Failed to load users'); setLoading(false); });
   }, []);
+
+  const reexportAll = async () => {
+    if (!window.confirm('Re-export all decks at the current quality setting? This will take a few minutes per deck.')) return;
+    setReexporting(true);
+    setReexportResult(null);
+    try {
+      const res = await api.post('/api/admin/reexport-all');
+      setReexportResult(res.data);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Re-export failed');
+    }
+    setReexporting(false);
+  };
 
   const setRole = async (userId, role) => {
     setUpdatingId(userId);
@@ -35,6 +50,24 @@ export default function AdminUsers() {
           <h1 style={{ fontSize: 22 }}>User Management</h1>
         </div>
       </header>
+
+      <div className="card" style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 16, padding: '12px 16px' }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontWeight: 500, fontSize: 14, marginBottom: 2 }}>Re-export all decks</div>
+          <div style={{ fontSize: 12, color: 'var(--text)' }}>Regenerates slide images at the current resolution setting (3200×1800). Decks stay accessible while processing.</div>
+        </div>
+        <button className="btn btn-secondary btn-sm" onClick={reexportAll} disabled={reexporting}>
+          <RefreshCw size={14} style={reexporting ? { animation: 'spin 1s linear infinite' } : {}} />
+          {reexporting ? 'Queuing...' : 'Re-export all'}
+        </button>
+      </div>
+
+      {reexportResult && (
+        <div style={{ marginBottom: 16, padding: '10px 14px', borderRadius: 'var(--radius)', background: 'rgba(16,185,129,0.1)', border: '1px solid var(--success)', fontSize: 13, color: 'var(--success)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>{reexportResult.queued} deck{reexportResult.queued !== 1 ? 's' : ''} queued.{reexportResult.errors?.length > 0 ? ` ${reexportResult.errors.length} failed — check server logs.` : ' Watch the dashboard for progress.'}</span>
+          <button onClick={() => setReexportResult(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, lineHeight: 1, color: 'inherit', padding: 0 }}>&times;</button>
+        </div>
+      )}
 
       {error && (
         <div style={{ marginBottom: 16, padding: '10px 14px', borderRadius: 'var(--radius)', background: 'rgba(220,53,69,0.12)', border: '1px solid var(--danger)', color: 'var(--danger)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 14 }}>
