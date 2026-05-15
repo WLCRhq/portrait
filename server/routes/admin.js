@@ -48,6 +48,44 @@ router.patch('/users/:userId', validate(updateRoleSchema), async (req, res) => {
   res.json(user);
 });
 
+// GET /api/admin/drive-check — Test whether the current user's token can export a PDF
+router.get('/drive-check', async (req, res) => {
+  const deck = await prisma.deck.findFirst({
+    where: { userId: req.session.userId },
+    select: { googleId: true, title: true },
+  });
+
+  if (!deck) {
+    return res.json({ ok: false, reason: 'No decks found to test with' });
+  }
+
+  try {
+    const { getAuthClient } = await import('../services/googleSlides.js');
+    const { google } = await import('googleapis');
+    const authClient = await getAuthClient(req.session.userId);
+    const drive = google.drive({ version: 'v3', auth: authClient });
+
+    // Request just 1 byte to check permission without downloading the whole PDF
+    const result = await drive.files.export(
+      { fileId: deck.googleId, mimeType: 'application/pdf' },
+      { responseType: 'arraybuffer', headers: { Range: 'bytes=0-0' } },
+    );
+
+    const size = Buffer.from(result.data).length;
+    res.json({ ok: true, deck: deck.title, bytesReceived: size, scope: 'drive.readonly confirmed' });
+  } catch (err) {
+    const status = err?.response?.status;
+    res.json({
+      ok: false,
+      deck: deck.title,
+      status,
+      reason: status === 403
+        ? 'Token lacks drive.readonly scope — log out and log back in, then re-export'
+        : err.message,
+    });
+  }
+});
+
 // POST /api/admin/reexport-all — Re-export every deck at the current quality setting
 router.post('/reexport-all', async (req, res) => {
   const decks = await prisma.deck.findMany({

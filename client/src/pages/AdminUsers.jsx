@@ -10,12 +10,26 @@ export default function AdminUsers() {
   const [updatingId, setUpdatingId] = useState(null);
   const [reexporting, setReexporting] = useState(false);
   const [reexportResult, setReexportResult] = useState(null);
+  const [driveCheck, setDriveCheck] = useState(null);
+  const [checking, setChecking] = useState(false);
 
   useEffect(() => {
     api.get('/api/admin/users')
       .then(res => { setUsers(res.data); setLoading(false); })
       .catch(() => { setError('Failed to load users'); setLoading(false); });
   }, []);
+
+  const checkDrive = async () => {
+    setChecking(true);
+    setDriveCheck(null);
+    try {
+      const res = await api.get('/api/admin/drive-check');
+      setDriveCheck(res.data);
+    } catch {
+      setDriveCheck({ ok: false, reason: 'Request failed' });
+    }
+    setChecking(false);
+  };
 
   const reexportAll = async () => {
     if (!window.confirm('Re-export all decks at the current quality setting? This will take a few minutes per deck.')) return;
@@ -50,6 +64,23 @@ export default function AdminUsers() {
           <h1 style={{ fontSize: 22 }}>User Management</h1>
         </div>
       </header>
+
+      <div className="card" style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 16, padding: '12px 16px' }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontWeight: 500, fontSize: 14, marginBottom: 2 }}>Google Drive access check</div>
+          <div style={{ fontSize: 12, color: 'var(--text)' }}>Verifies your token has the <code>drive.readonly</code> scope needed for high-res PDF export. Run this before re-exporting.</div>
+        </div>
+        <button className="btn btn-secondary btn-sm" onClick={checkDrive} disabled={checking}>
+          {checking ? 'Checking...' : 'Check access'}
+        </button>
+      </div>
+
+      {driveCheck && (
+        <div style={{ marginBottom: 8, padding: '10px 14px', borderRadius: 'var(--radius)', fontSize: 13, display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: `1px solid ${driveCheck.ok ? 'var(--success)' : 'var(--danger)'}`, background: driveCheck.ok ? 'rgba(16,185,129,0.1)' : 'rgba(220,53,69,0.1)', color: driveCheck.ok ? 'var(--success)' : 'var(--danger)' }}>
+          <span>{driveCheck.ok ? `✓ Drive access confirmed for "${driveCheck.deck}"` : `✗ ${driveCheck.reason}`}</span>
+          <button onClick={() => setDriveCheck(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, lineHeight: 1, color: 'inherit', padding: 0 }}>&times;</button>
+        </div>
+      )}
 
       <div className="card" style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 16, padding: '12px 16px' }}>
         <div style={{ flex: 1 }}>
