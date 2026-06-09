@@ -9,7 +9,7 @@ import morgan from 'morgan';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-import authRoutes from './routes/auth.js';
+import authRoutes, { meHandler } from './routes/auth.js';
 import deckRoutes from './routes/decks.js';
 import linkRoutes from './routes/links.js';
 import proposalRoutes from './routes/proposals.js';
@@ -65,6 +65,9 @@ app.use(session({
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
 import { authLimiter, apiLimiter } from './middleware/rateLimiter.js';
+
+// /auth/me is a session read called on every page load — use the relaxed API limit, not the login limiter
+app.get('/auth/me', apiLimiter, meHandler);
 
 // Routes — public (no auth)
 app.use('/auth', authLimiter, authRoutes);

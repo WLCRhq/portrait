@@ -88,8 +88,8 @@ router.get('/google/callback', async (req, res) => {
   }
 });
 
-// Get current user
-router.get('/me', async (req, res) => {
+// Get current user — exported so index.js can register it under apiLimiter instead of authLimiter
+export async function meHandler(req, res) {
   if (!req.session?.userId) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
@@ -104,7 +104,8 @@ router.get('/me', async (req, res) => {
   }
 
   res.json({ ...user, csrfToken: generateCsrf(req) });
-});
+}
+router.get('/me', meHandler);
 
 // Logout (CSRF-protected)
 router.post('/logout', (req, res) => {
