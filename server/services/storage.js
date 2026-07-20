@@ -40,6 +40,33 @@ export function getSlideImagePath(deckId, slideIndex) {
 }
 
 /**
+ * Total size in bytes of a deck's stored images (slides + overlays).
+ * Returns 0 if the deck has no files on disk.
+ */
+export async function getDeckStorageBytes(deckId) {
+  async function dirSize(dir) {
+    let total = 0;
+    let entries;
+    try {
+      entries = await fs.readdir(dir, { withFileTypes: true });
+    } catch {
+      return 0;
+    }
+    for (const entry of entries) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        total += await dirSize(full);
+      } else {
+        const stat = await fs.stat(full).catch(() => null);
+        if (stat) total += stat.size;
+      }
+    }
+    return total;
+  }
+  return dirSize(path.join(UPLOADS_DIR, deckId));
+}
+
+/**
  * Save a GIF overlay for a specific slide.
  * Returns the relative URL path.
  */

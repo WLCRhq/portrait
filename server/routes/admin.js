@@ -4,7 +4,7 @@ import prisma from '../lib/prisma.js';
 import { validate } from '../lib/validate.js';
 import { logAudit } from '../lib/audit.js';
 import { getAuthClient, getPresentationMetadata } from '../services/googleSlides.js';
-import { deleteDeckImages } from '../services/storage.js';
+import { deleteDeckImages, getDeckStorageBytes } from '../services/storage.js';
 import { exportQueue } from '../jobs/exportWorker.js';
 
 const router = Router();
@@ -27,6 +27,30 @@ router.get('/users', async (req, res) => {
     },
   });
   res.json(users);
+});
+
+// GET /api/admin/deck-storage — per-deck disk usage, largest first
+router.get('/deck-storage', async (req, res) => {
+  const decks = await prisma.deck.findMany({
+    select: {
+      id: true,
+      title: true,
+      slideCount: true,
+      exportedAt: true,
+      user: { select: { name: true } },
+    },
+  });
+
+  const withSizes = await Promise.all(decks.map(async deck => ({
+    ...deck,
+    bytes: await getDeckStorageBytes(deck.id),
+  })));
+
+  withSizes.sort((a, b) => b.bytes - a.bytes);
+  res.json({
+    totalBytes: withSizes.reduce((sum, d) => sum + d.bytes, 0),
+    decks: withSizes,
+  });
 });
 
 // PATCH /api/admin/users/:userId — change a user's role
@@ -59,29 +83,43 @@ router.get('/drive-check', async (req, res) => {
     return res.json({ ok: false, reason: 'No decks found to test with' });
   }
 
+  const { getAuthClient } = await import('../services/googleSlides.js');
+  const { exportPresentationPdf, driveErrorReason } = await import('../services/imageExport.js');
+  const authClient = await getAuthClient(req.session.userId);
+
+  // Report the token's actual granted scopes so failures aren't guesswork
+  let scopes = null;
   try {
-    const { getAuthClient } = await import('../services/googleSlides.js');
-    const { google } = await import('googleapis');
-    const authClient = await getAuthClient(req.session.userId);
-    const drive = google.drive({ version: 'v3', auth: authClient });
+    const { token } = await authClient.getAccessToken();
+    const infoRes = await fetch(`https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=${token}`);
+    const info = await infoRes.json();
+    if (info.scope) scopes = info.scope.split(' ').map(s => s.replace('https://www.googleapis.com/auth/', ''));
+  } catch {
+    // tokeninfo unavailable — scopes stay null
+  }
 
-    // Request just 1 byte to check permission without downloading the whole PDF
-    const result = await drive.files.export(
-      { fileId: deck.googleId, mimeType: 'application/pdf' },
-      { responseType: 'arraybuffer', headers: { Range: 'bytes=0-0' } },
-    );
-
-    const size = Buffer.from(result.data).length;
-    res.json({ ok: true, deck: deck.title, bytesReceived: size, scope: 'drive.readonly confirmed' });
+  try {
+    // Run the same export path the deck exporter uses (incl. exportLinks fallback)
+    const pdfBuffer = await exportPresentationPdf(authClient, deck.googleId);
+    res.json({
+      ok: true,
+      deck: deck.title,
+      pdfSizeMb: +(pdfBuffer.length / 1048576).toFixed(1),
+      scopes,
+    });
   } catch (err) {
     const status = err?.response?.status;
+    const reason = driveErrorReason(err);
+    const missingScope = scopes && !scopes.includes('drive.readonly');
     res.json({
       ok: false,
       deck: deck.title,
       status,
-      reason: status === 403
+      reason: reason || err.message,
+      scopes,
+      hint: missingScope
         ? 'Token lacks drive.readonly scope — log out and log back in, then re-export'
-        : err.message,
+        : 'Token scopes look correct — see reason for the actual Drive error',
     });
   }
 });

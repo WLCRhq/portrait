@@ -12,12 +12,21 @@ export default function AdminUsers() {
   const [reexportResult, setReexportResult] = useState(null);
   const [driveCheck, setDriveCheck] = useState(null);
   const [checking, setChecking] = useState(false);
+  const [storage, setStorage] = useState(null);
 
   useEffect(() => {
     api.get('/api/admin/users')
       .then(res => { setUsers(res.data); setLoading(false); })
       .catch(() => { setError('Failed to load users'); setLoading(false); });
+    api.get('/api/admin/deck-storage')
+      .then(res => setStorage(res.data))
+      .catch(() => {});
   }, []);
+
+  const formatSize = (bytes) => {
+    if (bytes >= 1073741824) return `${(bytes / 1073741824).toFixed(2)} GB`;
+    return `${(bytes / 1048576).toFixed(1)} MB`;
+  };
 
   const checkDrive = async () => {
     setChecking(true);
@@ -77,7 +86,12 @@ export default function AdminUsers() {
 
       {driveCheck && (
         <div style={{ marginBottom: 8, padding: '10px 14px', borderRadius: 'var(--radius)', fontSize: 13, display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: `1px solid ${driveCheck.ok ? 'var(--success)' : 'var(--danger)'}`, background: driveCheck.ok ? 'rgba(16,185,129,0.1)' : 'rgba(220,53,69,0.1)', color: driveCheck.ok ? 'var(--success)' : 'var(--danger)' }}>
-          <span>{driveCheck.ok ? `✓ Drive access confirmed for "${driveCheck.deck}"` : `✗ ${driveCheck.reason}`}</span>
+          <span>
+            {driveCheck.ok
+              ? `✓ Drive access confirmed for "${driveCheck.deck}" (${driveCheck.pdfSizeMb} MB PDF)`
+              : `✗ ${driveCheck.reason}${driveCheck.hint ? ` — ${driveCheck.hint}` : ''}`}
+            {driveCheck.scopes && <span style={{ display: 'block', opacity: 0.75, marginTop: 2 }}>Token scopes: {driveCheck.scopes.join(', ')}</span>}
+          </span>
           <button onClick={() => setDriveCheck(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, lineHeight: 1, color: 'inherit', padding: 0 }}>&times;</button>
         </div>
       )}
@@ -164,6 +178,37 @@ export default function AdminUsers() {
                         </button>
                       )}
                     </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {storage && storage.decks.length > 0 && (
+        <div className="card" style={{ padding: 0, overflow: 'hidden', marginTop: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
+            <span style={{ fontWeight: 500, fontSize: 14 }}>Deck storage</span>
+            <span style={{ fontSize: 13, color: 'var(--text)' }}>Total: {formatSize(storage.totalBytes)}</span>
+          </div>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                {['Deck', 'Owner', 'Slides', 'Size', 'Avg / slide'].map(h => (
+                  <th key={h} style={{ padding: '10px 16px', textAlign: 'left', fontSize: 12, fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {storage.decks.map(deck => (
+                <tr key={deck.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                  <td style={{ padding: '12px 16px', fontSize: 13, fontWeight: 500 }}>{deck.title}</td>
+                  <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--text)' }}>{deck.user?.name}</td>
+                  <td style={{ padding: '12px 16px', fontSize: 13 }}>{deck.slideCount}</td>
+                  <td style={{ padding: '12px 16px', fontSize: 13 }}>{formatSize(deck.bytes)}</td>
+                  <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--text)' }}>
+                    {deck.slideCount > 0 ? formatSize(deck.bytes / deck.slideCount) : '—'}
                   </td>
                 </tr>
               ))}

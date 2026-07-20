@@ -3,22 +3,64 @@ import { pdf } from 'pdf-to-img';
 import { getSlideThumbnailUrl } from './googleSlides.js';
 
 /**
+ * Extract the structured error reason from a Drive API error
+ * (e.g. 'exportSizeLimitExceeded'). Handles arraybuffer responses.
+ */
+export function driveErrorReason(err) {
+  try {
+    let data = err?.response?.data;
+    if (data instanceof ArrayBuffer || Buffer.isBuffer(data)) {
+      data = JSON.parse(Buffer.from(data).toString());
+    }
+    return data?.error?.errors?.[0]?.reason || err?.errors?.[0]?.reason || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Download a presentation as PDF. Tries files.export first; that endpoint
+ * caps exports at 10MB (403 exportSizeLimitExceeded), so large decks fall
+ * back to the exportLinks URL from files.get, which has no such cap.
+ */
+export async function exportPresentationPdf(authClient, presentationId) {
+  const drive = google.drive({ version: 'v3', auth: authClient });
+
+  try {
+    const res = await drive.files.export({
+      fileId: presentationId,
+      mimeType: 'application/pdf',
+    }, {
+      responseType: 'arraybuffer',
+    });
+    return Buffer.from(res.data);
+  } catch (err) {
+    const reason = driveErrorReason(err);
+    console.warn(`[ImageExport] files.export failed (${reason || err.message}) — trying exportLinks`);
+
+    const meta = await drive.files.get({ fileId: presentationId, fields: 'exportLinks', supportsAllDrives: true });
+    const url = meta.data.exportLinks?.['application/pdf'];
+    if (!url) throw err;
+
+    const { token } = await authClient.getAccessToken();
+    const response = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}` },
+      redirect: 'follow',
+    });
+    if (!response.ok) {
+      throw new Error(`exportLinks fetch failed: ${response.status} ${response.statusText}`);
+    }
+    return Buffer.from(await response.arrayBuffer());
+  }
+}
+
+/**
  * Export a presentation as PDF via Google Drive API, then convert
  * each page to a high-resolution PNG.
  * Returns an array of Buffers (one per slide).
  */
 export async function exportSlidesFromPdf(authClient, presentationId, slideCount) {
-  const drive = google.drive({ version: 'v3', auth: authClient });
-
-  // Export the entire presentation as PDF
-  const res = await drive.files.export({
-    fileId: presentationId,
-    mimeType: 'application/pdf',
-  }, {
-    responseType: 'arraybuffer',
-  });
-
-  const pdfBuffer = Buffer.from(res.data);
+  const pdfBuffer = await exportPresentationPdf(authClient, presentationId);
   console.log(`[ImageExport] PDF downloaded: ${(pdfBuffer.length / 1024 / 1024).toFixed(1)} MB`);
 
   // Convert each PDF page to a high-res PNG
