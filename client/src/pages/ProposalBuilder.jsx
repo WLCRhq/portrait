@@ -836,10 +836,10 @@ function LinksTab({ proposalId, error, setError }) {
     }
   };
 
-  const copyUrl = (slug) => {
-    const url = `${window.location.origin}/view/${slug}`;
+  const copyUrl = (link) => {
+    const url = link.viewerUrl || `${window.location.origin}/${link.slug}`;
     navigator.clipboard.writeText(url);
-    setCopied(slug);
+    setCopied(link.slug);
     setTimeout(() => setCopied(null), 2000);
   };
 
@@ -886,10 +886,10 @@ function LinksTab({ proposalId, error, setError }) {
                     <span style={{ fontSize: 12, color: 'var(--text)' }}>{link._count.sessions} view{link._count.sessions !== 1 ? 's' : ''}</span>
                   )}
                 </div>
-                <code style={{ fontSize: 12, color: 'var(--text)' }}>/view/{link.slug}</code>
+                <code style={{ fontSize: 12, color: 'var(--text)' }}>/{link.slug}</code>
               </div>
               <div style={{ display: 'flex', gap: 6 }}>
-                <button className="btn btn-secondary btn-sm" onClick={() => copyUrl(link.slug)}>
+                <button className="btn btn-secondary btn-sm" onClick={() => copyUrl(link)}>
                   {copied === link.slug ? 'Copied!' : 'Copy'}
                 </button>
                 <button

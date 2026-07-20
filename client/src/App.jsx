@@ -27,7 +27,9 @@ export default function App() {
       <Route path="/dashboard/proposals" element={<Proposals />} />
       <Route path="/dashboard/proposals/:proposalId" element={<ProposalBuilder />} />
       <Route path="/dashboard/admin/users" element={<AdminUsers />} />
+      {/* /view/:slug kept for links sent before slugs moved to the root path */}
       <Route path="/view/:slug" element={<Viewer />} />
+      <Route path="/:slug" element={<Viewer />} />
     </Routes>
   );
 }

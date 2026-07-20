@@ -1,10 +1,11 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { nanoid } from 'nanoid';
 import prisma from '../lib/prisma.js';
 import { requireDeckOwner } from '../middleware/requireOwner.js';
 import { validate } from '../lib/validate.js';
 import { logAudit } from '../lib/audit.js';
+import { viewerUrl } from '../lib/viewerUrl.js';
+import { uniqueSlug } from '../lib/slug.js';
 
 const router = Router();
 
@@ -30,7 +31,7 @@ router.post('/:deckId/links', validate(createLinkSchema), async (req, res) => {
   }
 
   const { label, expiresAt } = req.body;
-  const slug = nanoid(16);
+  const slug = await uniqueSlug(deck.title);
 
   const link = await prisma.shareLink.create({
     data: {
@@ -44,7 +45,7 @@ router.post('/:deckId/links', validate(createLinkSchema), async (req, res) => {
   logAudit(req.session.userId, 'link.create', link.id, { slug, deckId: deck.id });
   res.status(201).json({
     ...link,
-    viewerUrl: `${process.env.CLIENT_URL || 'http://localhost:5173'}/view/${slug}`,
+    viewerUrl: viewerUrl(slug),
   });
 });
 
@@ -66,7 +67,7 @@ router.get('/:deckId/links', async (req, res) => {
     },
   });
 
-  res.json(links);
+  res.json(links.map(link => ({ ...link, viewerUrl: viewerUrl(link.slug) })));
 });
 
 // PATCH /api/decks/:deckId/links/:linkId — Update a link (owner only)

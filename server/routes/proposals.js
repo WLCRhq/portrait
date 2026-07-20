@@ -1,10 +1,11 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { nanoid } from 'nanoid';
 import prisma from '../lib/prisma.js';
 import { requireProposalOwner } from '../middleware/requireOwner.js';
 import { validate } from '../lib/validate.js';
 import { logAudit } from '../lib/audit.js';
+import { viewerUrl } from '../lib/viewerUrl.js';
+import { uniqueSlug } from '../lib/slug.js';
 
 const router = Router();
 
@@ -221,7 +222,7 @@ router.post('/:proposalId/links', requireProposalOwner, validate(createLinkSchem
   }
 
   const { label, expiresAt } = req.body;
-  const slug = nanoid(16);
+  const slug = await uniqueSlug(proposal.title);
 
   const link = await prisma.shareLink.create({
     data: {
@@ -235,7 +236,7 @@ router.post('/:proposalId/links', requireProposalOwner, validate(createLinkSchem
   logAudit(req.session.userId, 'link.create', link.id, { slug, proposalId: proposal.id });
   res.status(201).json({
     ...link,
-    viewerUrl: `${process.env.CLIENT_URL || 'http://localhost:5173'}/view/${slug}`,
+    viewerUrl: viewerUrl(slug),
   });
 });
 
@@ -246,7 +247,7 @@ router.get('/:proposalId/links', async (req, res) => {
     orderBy: { createdAt: 'desc' },
     include: { _count: { select: { sessions: true } } },
   });
-  res.json(links);
+  res.json(links.map(link => ({ ...link, viewerUrl: viewerUrl(link.slug) })));
 });
 
 // PATCH /api/proposals/:proposalId/links/:linkId — Update a proposal link

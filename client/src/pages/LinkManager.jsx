@@ -62,7 +62,7 @@ export default function LinkManager() {
   };
 
   const copyToClipboard = (link) => {
-    const url = link.viewerUrl || `${window.location.origin}/view/${link.slug}`;
+    const url = link.viewerUrl || `${window.location.origin}/${link.slug}`;
     navigator.clipboard.writeText(url);
     setCopiedId(link.id);
     setTimeout(() => setCopiedId(null), 2000);
@@ -132,7 +132,7 @@ export default function LinkManager() {
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                   <code style={{ fontSize: 13, background: 'var(--bg-secondary)', padding: '2px 6px', borderRadius: 4 }}>
-                    /view/{link.slug}
+                    /{link.slug}
                   </code>
                   {link.active ? (
                     <span className="badge badge-success">Active</span>
