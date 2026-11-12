@@ -3,7 +3,7 @@ import { z } from 'zod';
 import geoip from 'geoip-lite';
 import { UAParser } from 'ua-parser-js';
 import prisma from '../lib/prisma.js';
-import { viewerLimiter } from '../middleware/rateLimiter.js';
+import { viewerLimiter, slideAssetLimiter } from '../middleware/rateLimiter.js';
 import { getSlideImagePath } from '../services/storage.js';
 import { anonymizeIp } from '../lib/privacy.js';
 import fs from 'fs';
@@ -28,8 +28,8 @@ const clientInfoSchema = z.object({
 
 const router = Router();
 
-// Apply rate limiting to all viewer endpoints
-router.use(viewerLimiter);
+// Rate limiting is applied per route: slide images/overlays get the loose
+// slideAssetLimiter, everything else (sessions, analytics events) viewerLimiter.
 
 // Fire-and-forget ISP lookup via ip-api.com; updates session after response
 function lookupIsp(ip, sessionId) {
@@ -87,7 +87,7 @@ async function resolveLink(slug) {
 }
 
 // GET /api/view/:slug/meta — Get presentation metadata and create session
-router.get('/:slug/meta', async (req, res) => {
+router.get('/:slug/meta', viewerLimiter, async (req, res) => {
   const result = await resolveLink(req.params.slug);
   if (result.error) {
     return res.status(result.status).json({ error: result.error });
@@ -170,7 +170,7 @@ router.get('/:slug/meta', async (req, res) => {
 });
 
 // POST /api/view/:slug/event — Record a slide viewing event
-router.post('/:slug/event', async (req, res) => {
+router.post('/:slug/event', viewerLimiter, async (req, res) => {
   const parsed = slideEventSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({
@@ -207,7 +207,7 @@ router.post('/:slug/event', async (req, res) => {
 });
 
 // POST /api/view/:slug/end — End a viewing session
-router.post('/:slug/end', async (req, res) => {
+router.post('/:slug/end', viewerLimiter, async (req, res) => {
   const parsed = endSessionSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: 'Invalid request' });
@@ -236,7 +236,7 @@ router.post('/:slug/end', async (req, res) => {
 });
 
 // POST /api/view/:slug/clientinfo — Update session with client-side info (screen, timezone)
-router.post('/:slug/clientinfo', async (req, res) => {
+router.post('/:slug/clientinfo', viewerLimiter, async (req, res) => {
   const parsed = clientInfoSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: 'Invalid request' });
@@ -263,7 +263,7 @@ router.post('/:slug/clientinfo', async (req, res) => {
 });
 
 // GET /api/view/:slug/slide/:index/overlays — Get GIF overlays for a slide
-router.get('/:slug/slide/:index/overlays', async (req, res) => {
+router.get('/:slug/slide/:index/overlays', slideAssetLimiter, async (req, res) => {
   const result = await resolveLink(req.params.slug);
   if (result.error) {
     return res.status(result.status).json({ error: result.error });
@@ -299,7 +299,7 @@ router.get('/:slug/slide/:index/overlays', async (req, res) => {
 });
 
 // GET /api/view/:slug/slide/:index — Serve slide image from disk
-router.get('/:slug/slide/:index', async (req, res) => {
+router.get('/:slug/slide/:index', slideAssetLimiter, async (req, res) => {
   const result = await resolveLink(req.params.slug);
   if (result.error) {
     return res.status(result.status).json({ error: result.error });

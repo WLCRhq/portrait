@@ -6,6 +6,10 @@ import LoadingSpinner from '../components/LoadingSpinner.jsx';
 import SOWSlide from '../components/SOWSlide.jsx';
 import SOWTotalsSlide from '../components/SOWTotalsSlide.jsx';
 
+// Waits between automatic retries of a slide image that failed to load.
+// Together they outlast the server's 60s rate-limit window.
+const IMAGE_RETRY_DELAYS_MS = [2000, 5000, 10000, 20000, 30000];
+
 function isLightColor(hex) {
   if (!hex) return false;
   const c = hex.replace('#', '');
@@ -23,6 +27,10 @@ export default function Viewer() {
   const [error, setError] = useState(null);
   const [imageLoading, setImageLoading] = useState(true);
   const [overlays, setOverlays] = useState([]);
+  const [imageAttempt, setImageAttempt] = useState(0);
+  const [imageFailed, setImageFailed] = useState(false);
+  const retryTimerRef = useRef(null);
+  const currentSlideRef = useRef(0);
   const enteredAtRef = useRef(Date.now());
   const slideContainerRef = useRef(null);
   const preloadedRef = useRef(new Set());
@@ -153,10 +161,12 @@ export default function Viewer() {
     }
   }, [sessionId, slug]);
 
-  // Handle beforeunload — send final event + end session
+  // Handle beforeunload / unmount — send final event + end session.
+  // Reads the slide from a ref so this only runs when the viewer closes,
+  // not on every slide change.
   useEffect(() => {
     const handleUnload = () => {
-      sendSlideEvent(currentSlide, enteredAtRef.current);
+      sendSlideEvent(currentSlideRef.current, enteredAtRef.current);
       sendEndSession();
     };
 
@@ -165,7 +175,30 @@ export default function Viewer() {
       window.removeEventListener('beforeunload', handleUnload);
       handleUnload();
     };
-  }, [currentSlide, sendSlideEvent, sendEndSession]);
+  }, [sendSlideEvent, sendEndSession]);
+
+  // Cancel any pending image retry when the viewer unmounts
+  useEffect(() => () => clearTimeout(retryTimerRef.current), []);
+
+  // Slide image failed to load (e.g. rate limited): retry with backoff, then offer a manual retry
+  const handleImageError = () => {
+    clearTimeout(retryTimerRef.current);
+    if (imageAttempt >= IMAGE_RETRY_DELAYS_MS.length) {
+      setImageFailed(true);
+      setImageLoading(false);
+      return;
+    }
+    retryTimerRef.current = setTimeout(
+      () => setImageAttempt((a) => a + 1),
+      IMAGE_RETRY_DELAYS_MS[imageAttempt],
+    );
+  };
+
+  const retryImage = () => {
+    setImageFailed(false);
+    setImageLoading(true);
+    setImageAttempt((a) => a + 1);
+  };
 
   const goToSlide = (newIndex) => {
     if (!meta || newIndex < 0 || newIndex >= meta.slideCount) return;
@@ -173,8 +206,13 @@ export default function Viewer() {
     sendSlideEvent(currentSlide, enteredAtRef.current);
 
     setCurrentSlide(newIndex);
+    currentSlideRef.current = newIndex;
     setOverlays([]);
     enteredAtRef.current = Date.now();
+
+    clearTimeout(retryTimerRef.current);
+    setImageAttempt(0);
+    setImageFailed(false);
 
     // Only show image loading for deck slides
     if (getSlideType(newIndex) === 'deck_slide') {
@@ -273,6 +311,26 @@ export default function Viewer() {
           </div>
         )}
 
+        {/* Slide image could not be loaded after automatic retries */}
+        {isDeckSlide && imageFailed && (
+          <div style={{
+            position: 'absolute', inset: 0,
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            gap: 12, zIndex: 2,
+          }}>
+            <p style={{ margin: 0 }}>This slide couldn't be loaded.</p>
+            <button
+              onClick={retryImage}
+              style={{
+                padding: '8px 16px', borderRadius: 6, cursor: 'pointer',
+                background: 'transparent', color: textColor, border: `1px solid ${subtleColor}`,
+              }}
+            >
+              Try again
+            </button>
+          </div>
+        )}
+
         {isDeckSlide ? (
           /* Deck slide: image + overlays */
           <div
@@ -280,14 +338,15 @@ export default function Viewer() {
             style={{ position: 'relative', maxWidth: '100%', maxHeight: '100%' }}
           >
             <img
-              src={`/api/view/${slug}/slide/${currentSlide}${cacheBust}`}
+              src={`/api/view/${slug}/slide/${currentSlide}${cacheBust}${imageAttempt > 0 ? `${cacheBust ? '&' : '?'}retry=${imageAttempt}` : ''}`}
               alt={`Slide ${currentSlide + 1}`}
               style={{
                 maxWidth: '100vw', maxHeight: 'calc(100vh - 40px)', objectFit: 'contain',
                 display: 'block',
-                opacity: imageLoading ? 0 : 1, transition: 'opacity 0.3s ease',
+                opacity: imageLoading || imageFailed ? 0 : 1, transition: 'opacity 0.3s ease',
               }}
               onLoad={() => setImageLoading(false)}
+              onError={handleImageError}
               draggable={false}
             />
 

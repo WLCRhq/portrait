@@ -8,6 +8,17 @@ export const viewerLimiter = rateLimit({
   message: { error: 'Too many requests, please try again later.' },
 });
 
+// Slide images and overlay lookups: a viewer flipping quickly through a long
+// deck makes several of these per slide, and an office of viewers can share one
+// IP, so this is far looser than viewerLimiter.
+export const slideAssetLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 1200,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later.' },
+});
+
 export const apiLimiter = rateLimit({
   windowMs: 1 * 60 * 1000,
   max: 60,
