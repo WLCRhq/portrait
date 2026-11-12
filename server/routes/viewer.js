@@ -5,7 +5,7 @@ import { UAParser } from 'ua-parser-js';
 import prisma from '../lib/prisma.js';
 import { viewerLimiter, slideAssetLimiter } from '../middleware/rateLimiter.js';
 import { getSlideImagePath } from '../services/storage.js';
-import { anonymizeIp } from '../lib/privacy.js';
+import { anonymizeIp, isAnalyticsExcluded } from '../lib/privacy.js';
 import fs from 'fs';
 import path from 'path';
 
@@ -113,8 +113,12 @@ router.get('/:slug/meta', viewerLimiter, async (req, res) => {
   const osInfo = ua.getOS();
   const deviceInfo = ua.getDevice();
 
+  // Excluded IPs (e.g. our own office) get no session, so nothing is tracked:
+  // the client sends no events without a sessionId.
+  const excluded = isAnalyticsExcluded(ip);
+
   // Create viewing session
-  const session = await prisma.viewSession.create({
+  const session = excluded ? null : await prisma.viewSession.create({
     data: {
       linkId: link.id,
       viewerIp: anonymizeIp(ip),
@@ -131,14 +135,14 @@ router.get('/:slug/meta', viewerLimiter, async (req, res) => {
   });
 
   // Async ISP lookup (non-blocking — updates session when it resolves)
-  lookupIsp(ip, session.id);
+  if (session) lookupIsp(ip, session.id);
 
   if (type === 'proposal') {
     const proposal = link.proposal;
     const deck = proposal.deck;
 
     res.json({
-      sessionId: session.id,
+      sessionId: session?.id ?? null,
       type: 'proposal',
       proposalId: proposal.id,
       title: proposal.title,
@@ -158,7 +162,7 @@ router.get('/:slug/meta', viewerLimiter, async (req, res) => {
   } else {
     // Original deck response (backward compatible)
     res.json({
-      sessionId: session.id,
+      sessionId: session?.id ?? null,
       type: 'deck',
       deckId: link.deck.id,
       title: link.deck.title,

@@ -42,6 +42,9 @@ export default function Viewer() {
         setMeta(res.data);
         setSessionId(res.data.sessionId);
 
+        // No session means this viewer is excluded from analytics
+        if (!res.data.sessionId) return;
+
         // Send client-side info (screen resolution, timezone)
         const clientInfo = {
           sessionId: res.data.sessionId,

@@ -31,3 +31,23 @@ export function anonymizeIp(ip) {
 
   return ip;
 }
+
+// IPs whose views are never recorded in analytics (e.g. our own office).
+// Override with a comma-separated ANALYTICS_EXCLUDED_IPS env var.
+const DEFAULT_EXCLUDED_IPS = '50.190.41.54';
+
+function normalizeIp(ip) {
+  const trimmed = String(ip || '').trim().toLowerCase();
+  return trimmed.startsWith('::ffff:') && trimmed.includes('.') ? trimmed.slice(7) : trimmed;
+}
+
+/**
+ * True if views from this (raw, un-anonymized) IP should not be tracked.
+ */
+export function isAnalyticsExcluded(ip) {
+  const list = (process.env.ANALYTICS_EXCLUDED_IPS ?? DEFAULT_EXCLUDED_IPS)
+    .split(',')
+    .map(normalizeIp)
+    .filter(Boolean);
+  return list.includes(normalizeIp(ip));
+}
